@@ -1,0 +1,44 @@
+% Atom types for GBSA.
+% Subsequence matches replace earlier matches, so most general types should go first, more specific types later.
+
+% SMARTS atom match                   typename         comment
+
+[#6]                                  C                % carbon
+[$([#6]=[*]),$([#6]#[*]),$([#6]:[*])] C(pi)            % carbon (pi-bonded)
+[#7]                                  N                % nitrogen
+[$([#7]=[*]),$([#7]#[*]),$([#7]:[*])] N(pi)            % nitrogen (pi-bonded)
+[#8]                                  O                % oxygen
+[$([#8]=[*]),$([#8]#[*]),$([#8]:[*])] O(pi)            % oxygen (pi-bonded)
+[$([#1]~[#7])]                        HN               % H (on N)
+[$([#1]~[#8])]                        HO               % H (on O)
+[$([#1]~[#15])]                       HP               % H (on P)
+[$([#1]~[#16])]                       HS               % H (on S)
+[$([#1]~[#6])]                        HC               % H (on C)
+[#15]                                 P                % phosphorus
+[#16]                                 S                % sulfur
+[#9]                                  F                % fluorine
+[#17]                                 Cl               % chlorine
+[#35]                                 Br               % bromine
+[#53]                                 I                % iodine
+
+
+H-C          1.25         0.85
+H-N          1.15         0.85
+H-O          1.05         0.85
+H-S          1.25         0.85
+C-SP         1.875        0.72
+C-SP2        1.875        0.72
+C-SP3        1.90         0.72
+N-SP         1.706        0.79
+N-SP2        1.706        0.79
+N-SP3        1.706        0.79
+N-SP3P       1.625        0.79
+O-SP2        1.480        0.85
+O-SP3        1.535        0.85
+S-SP3        1.775        0.96
+S-HYP        1.775        0.96
+P            1.87         0.86
+F            1.47         0.86
+Cl           1.735        0.80
+Br           1.90         0.80
+I            1.20         0.80

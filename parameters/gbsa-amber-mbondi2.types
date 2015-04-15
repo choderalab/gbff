@@ -1,0 +1,17 @@
+% Atom types for GBSA.
+% Subsequence matches replace earlier matches, so most general types should go first, more specific types later.
+
+% SMARTS atom match                   typename         comment
+
+[#1]                                  H                % H
+[$([#1]~[#7])]                        HN               % H (on N)
+[#6]                                  C                % carbon
+[#7]                                  N                % nitrogen
+[#8]                                  O                % oxygen
+[#9]                                  F                % fluorine
+[#14]                                 Si               % silicon
+[#15]                                 P                % phosphorus
+[#16]                                 S                % sulfur
+[#17]                                 Cl               % chlorine
+[#35]                                 Br               % bromine
+[#53]                                 I                % iodine
