@@ -8,7 +8,7 @@ import os
 import glob
 import gaff2xml
 
-FREESOLV_PATH = "/home/kyleb/src/choderalab/FreeSolv/"
+FREESOLV_PATH = os.environ["FREESOLV_PATH"]
 FREESOLV_FILENAME = os.path.join(FREESOLV_PATH, "primary-data/primary-data.pickle")
 
 database = pickle.load(open(FREESOLV_FILENAME))
