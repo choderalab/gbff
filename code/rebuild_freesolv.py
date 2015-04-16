@@ -17,7 +17,6 @@ for (key, entry) in database.items():
     print "Processing molecule %s ..." % (key)
     
     tripos_filename = os.path.join('tripos_mol2', key + '.mol2')
-    gaff_mol2_filename = os.path.join("./gaff_mol2/", "%s.prmtop" % key)
     frcmod_filename = os.path.join("./gaff_mol2/", "%s.frcmod" % key)
     gaff_mol2_filename = os.path.join("./gaff_mol2/", "%s.mol2" % key)
     frcmod_filename = os.path.join("./gaff_mol2/", "%s.frcmod" % key)
