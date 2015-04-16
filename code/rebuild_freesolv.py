@@ -19,7 +19,6 @@ for (key, entry) in database.items():
     tripos_filename = os.path.join('tripos_mol2', key + '.mol2')
     frcmod_filename = os.path.join("./gaff_mol2/", "%s.frcmod" % key)
     gaff_mol2_filename = os.path.join("./gaff_mol2/", "%s.mol2" % key)
-    frcmod_filename = os.path.join("./gaff_mol2/", "%s.frcmod" % key)
     prmtop_filename = os.path.join("./gaff_mol2/", "%s.prmtop" % key)
     inpcrd_filename = os.path.join("./gaff_mol2/", "%s.inpcrd" % key)
 
