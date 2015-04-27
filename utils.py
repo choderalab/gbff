@@ -44,8 +44,11 @@ from openeye import oechem
 from openeye import oequacpac
 from openeye import oeiupac
 from openeye import oeomega
-
+import gaff2xml
 import pymc
+import shutil
+import numpy as np
+import numpy.linalg as linalg
 
 import pymbar
 
@@ -306,7 +309,7 @@ def compute_hydration_energies(database, parameters):
     from pymbar import MBAR
 
     if 'gbmodel' in parameters:
-        gbmodel = parameters['gbmodel']
+        gbmodel = parameters['gbmodel'].value
     else:
         gbmodel = None
 
@@ -396,7 +399,10 @@ def compute_hydration_energies(database, parameters):
         N_k[0] = nsamples
 
         mbar = MBAR(u_kln, N_k)
-        [df_ij, ddf_ij] = mbar.getFreeEnergyDifferences()
+        try:
+            df_ij, ddf_ij, _ = mbar.getFreeEnergyDifferences()
+        except linalg.LinAlgError:
+            return np.inf
 
         DeltaG_in_kT = df_ij[1,2]
         dDeltaG_in_kT = ddf_ij[1,2]
@@ -522,8 +528,12 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
     N_k = numpy.zeros([nstates], numpy.int32)
     N_k[0] = nsamples
 
+
     mbar = MBAR(u_kln, N_k)
-    [df_ij, ddf_ij] = mbar.getFreeEnergyDifferences()
+    try:
+        df_ij, ddf_ij, _ = mbar.getFreeEnergyDifferences()
+    except linalg.LinAlgError:
+        return np.inf
 
     DeltaG_in_kT = df_ij[1,2]
     dDeltaG_in_kT = ddf_ij[1,2]
@@ -552,36 +562,41 @@ def hydration_energy_factory(entry, hydration_factory_parameters):
 # Prepare the FreeSolv-format database for calculations.
 #=============================================================================================
 
-def prepare_database(database, atomtypes_filename, parameters, mol2_directory=None, verbose=False):
+def prepare_database(database, atomtypes_filename,parameters,  mol2_directory, verbose=False):
     """
-    Prepare the database for calculations, operating in place.
+    Wrapper function to prepare the database for sampling
 
-    Parameters
-    ----------
+    """
+
+    database_prepped = load_database(database, mol2_directory, verbose=verbose)
+    database_with_systems = create_openmm_systems(database_prepped, verbose=verbose)
+    database_atomtyped = type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
+    database_simulated = generate_simulation_data(database_atomtyped, parameters)
+    return database_simulated
+
+def load_database(database, mol2_directory, verbose=False):
+    """
+    This function prepares the database that will be use in sampling.
+
+    Arguments
+    ---------
     database : dict
-       FreeSolv format database.
-    atomtypes_filename : str
-       Filename specifying atom types for patty atom typer.
-    parameters : dict
-       Parameters to use in initial atom typing.
-    mol2_directory : str, optional, default=None
-       Directory name to read mol2 files for corresponding entries in database; otherwise will generate based on SMILES strings.
-    verbose : bool, optiona, default=False
-       Control verbosity.
+        an unpickled version of the FreeSolv database
+    mol2_directory : String
+        the path to the FreeSolv mol2 files containing geometry and charges
+    verbose : Boolean, optional
+        verbosity
 
+    Returns
+    -------
+    database : dict
+        An updated version of the database dict containing OEMols
     """
 
-    # Create omega instance in case we have to generate geometry.
-    omega = oeomega.OEOmega()
-    omega.SetMaxConfs(1)
-    omega.SetFromCT(True)
-
-    # Process all molecules in the dataset.
-    charge_method = None # charge method to be used in antechamber call
     start_time = time.time()
-    print "Reading all molecules in dataset, creating configurations if needed..."
+    if verbose:
+        print("Reading all molecules in dataset. Will use charges and coordinates from dataset.")
     for cid in database.keys():
-        # Get database entry.
         entry = database[cid]
 
         # Store temperature
@@ -596,26 +611,12 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
 
         # Read molecule.
         molecule = openeye.oechem.OEMol()
-        if mol2_directory:
-            # Load the mol2 file.
-            tripos_mol2_filename = os.path.join(mol2_directory, cid + '.mol2')
-            omolstream = oechem.oemolistream(tripos_mol2_filename)
-            oechem.OEReadMolecule(omolstream, molecule)
-            omolstream.close()
-            # Will use mol2 charges.
-            charge_method = None
 
-        else:
-            # Create OpenEye molecule from SMILES representation.
-            openeye.oechem.OEParseSmiles(molecule, smiles)
-            # Create geometry.
-            omega(molecule)
-            # TODO: Add Christopher Bayly suggested method to expand conformations and pick most "open" one for charging by OpenEye tools.
-
-            # Be sure to assign charges.
-            charge_method = 'bcc'
-
-        # Set properties.
+        # Load the mol2 file.
+        tripos_mol2_filename = os.path.join(mol2_directory, cid + '.mol2')
+        omolstream = oechem.oemolistream(tripos_mol2_filename)
+        oechem.OEReadMolecule(omolstream, molecule)
+        omolstream.close()
         molecule.SetTitle(iupac_name)
         molecule.SetData('smiles', smiles)
         molecule.SetData('cid', cid)
@@ -628,14 +629,32 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
         # Store molecule.
         entry['molecule'] = oechem.OEMol(molecule)
 
-    print "%d molecules read" % len(database.keys())
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print "%.3f s elapsed" % elapsed_time
+        if verbose:
+            print "%d molecules read" % len(database.keys())
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print "%.3f s elapsed" % elapsed_time
+    return database
 
-    # Create OpenMM System objects.
-    import gaff2xml
-    print "Running Antechamber..."
+def create_openmm_systems(database, verbose=False):
+    """
+    Create an OpenMM system for each molecule in the database
+
+    Arguments
+    ---------
+    database : dict
+        dict containing FreeSolv molecules (prepared using prepare_database)
+    verbose : Boolean, optional
+        verbosity
+
+    Returns
+    -------
+    database : dict
+        The FreeSolv database dict containing OpenMM systems for each molecule
+    """
+    charge_method = None #the charges should already be assigned
+    if verbose:
+        print("Running antechamber")
     original_directory = os.getcwd()
     working_directory = tempfile.mkdtemp()
     os.chdir(working_directory)
@@ -645,9 +664,9 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
         entry = database[cid]
         molecule = entry['molecule']
 
-        if verbose: print "  " + molecule.GetTitle()
+        if verbose:
+            print("  " + molecule.GetTitle())
 
-        # Write molecule in Tripos format.
         tripos_mol2_filename = 'molecule.tripos.mol2'
         omolstream = oechem.oemolostream(tripos_mol2_filename)
         oechem.OEWriteMolecule(omolstream, molecule)
@@ -668,6 +687,7 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
             # Store system and positions.
             entry['system'] = system
             entry['positions'] = positions
+            #TODO: verify that oemol and prmtop atoms match
         except Exception as e:
             print e
             problematic_cids.append(cid)
@@ -676,20 +696,10 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
         for filename in os.listdir(working_directory):
             os.unlink(filename)
 
-    # Ensure atom names match between OEMol and prmtop representations.
-    oemol_atoms = [atom for atom in molecule.GetAtoms()]
-    top_atoms = list(prmtop.topology.atoms())
-    for (oemol_atom, top_atom) in zip(oemol_atoms, top_atoms):
-        oemol_atom_name = oemol_atom.GetName()
-        prmtop_atom_name = top_atom.name
-        if (oemol_atom_name != prmtop_atom_name):
-            raise Exception("molecule %s : OEMol has atom %s while prmtop has atom %s" % (cid, oemol_atom_name, prmtop_atom_name))
-
     os.chdir(original_directory)
-    # TODO: Remove temporary directory and contents.
+    shutil.rmtree(working_directory)
 
-    # Remove problematic molecules
-    print "Problematic molecules: %s" % str(problematic_cids)
+    print("Problematic molecules: %s" % str(problematic_cids))
     outfile = open('removed-molecules.txt', 'w')
     for cid in problematic_cids:
         iupac = database[cid]['iupac']
@@ -697,7 +707,32 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
         del database[cid]
     outfile.close()
 
-    # Construct atom typer.
+    if verbose:
+        print "%d systems attmpted" % len(database.keys())
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print "%.3f s elapsed" % elapsed_time
+
+    return database
+
+
+def type_atoms(database, atomtypes_filename, verbose=False):
+    """
+    Generate types for each atom in each molecule
+
+    Arguments
+    ---------
+    database : dict
+        dict containing Freesolv database (prepared with prep_database)
+    atomtypes_filename : String
+        location of the filename containing the set of atomtypes
+
+    Returns
+    -------
+    database : dict
+        Freesolv dict with molecule atom types set.
+    """
+
     atom_typer = AtomTyper(atomtypes_filename, "gbsa_type")
 
     # Type all molecules with GBSA parameters.
@@ -708,7 +743,8 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
         entry = database[cid]
         molecule = entry['molecule']
 
-        if verbose: print "  " + molecule.GetTitle()
+        if verbose:
+            print("  " + molecule.GetTitle())
 
         # Assign GBSA types according to SMARTS rules.
         try:
@@ -719,26 +755,24 @@ def prepare_database(database, atomtypes_filename, parameters, mol2_directory=No
             print name
             print exception
             untyped_molecules.append(oechem.OEGraphMol(molecule))
-            if( len(untyped_molecules) > 10 ):
-               sys.exit(-1)
+            if len(untyped_molecules) > 10:
+                sys.exit(-1)
 
         # DEBUG: Report types
-        print "Molecule %s : %s" % (cid, entry['iupac'])
-        for atom in molecule.GetAtoms():
-            print "%5s : %5s" % (atom.GetName(), atom.GetStringData("gbsa_type"))
-        print ""
+        if verbose:
+            print("Molecule %s : %s" % (cid, entry['iupac']))
+            for atom in molecule.GetAtoms():
+                print("%5s : %5s" % (atom.GetName(), atom.GetStringData("gbsa_type")))
 
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print "%d molecules correctly typed" % (len(typed_molecules))
-    print "%d molecules missing some types" % (len(untyped_molecules))
-    print "%.3f s elapsed" % elapsed_time
+    if verbose:
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print("%d molecules correctly typed" % (len(typed_molecules)))
+        print("%d molecules missing some types" % (len(untyped_molecules)))
+        print("%.3f s elapsed" % elapsed_time)
 
-    # Generate simulation data.
-    print "Generating simulation data for all molecules..."
-    start_time = time.time()
-    generate_simulation_data(database, parameters)
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print "%.3f s elapsed" % elapsed_time
+    return database
+
+
+
 
