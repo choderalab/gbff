@@ -23,8 +23,6 @@ import os.path
 import time
 import copy
 
-import numpy
-
 import simtk.openmm as openmm
 import simtk.unit as units
 import simtk.openmm.app as app
@@ -156,15 +154,15 @@ def generate_simulation_data(database, parameters):
         initial_time = time.time()
         nsteps_per_iteration = 2500
         niterations = 200
-        x_n = numpy.zeros([niterations,natoms,3], numpy.float32) # positions, in nm
-        u_n = numpy.zeros([niterations], numpy.float64) # energy differences, in kT
+        x_n = np.zeros([niterations,natoms,3], np.float32) # positions, in nm
+        u_n = np.zeros([niterations], np.float64) # energy differences, in kT
         for iteration in range(niterations):
             integrator.step(nsteps_per_iteration)
             state = context.getState(getEnergy=True, getPositions=True)
             x_n[iteration,:,:] = state.getPositions(asNumpy=True) / units.nanometers
             u_n[iteration] = beta * state.getPotentialEnergy()
 
-        if numpy.any(numpy.isnan(u_n)):
+        if np.any(np.isnan(u_n)):
             raise Exception("Encountered NaN for molecule %s | %s" % (cid, iupac_name))
 
         final_time = time.time()
@@ -289,7 +287,7 @@ def compute_hydration_energies(database, parameters):
         u_n = entry['u_n']
         nsamples = len(u_n)
         nstates = 3 # number of thermodynamic states
-        u_kln = numpy.zeros([3,3,nsamples], numpy.float64)
+        u_kln = np.zeros([3,3,nsamples], np.float64)
         for sample in range(nsamples):
             positions = units.Quantity(x_n[sample,:,:], units.nanometers)
 
@@ -303,7 +301,7 @@ def compute_hydration_energies(database, parameters):
             solvent_state = solvent_context.getState(getEnergy=True)
             u_kln[0,2,sample] = beta * solvent_state.getPotentialEnergy()
 
-        N_k = numpy.zeros([nstates], numpy.int32)
+        N_k = np.zeros([nstates], np.int32)
         N_k[0] = nsamples
 
         mbar = MBAR(u_kln, N_k)
@@ -419,7 +417,7 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
     u_n = entry['u_n']
     nsamples = len(u_n)
     nstates = 3 # number of thermodynamic states
-    u_kln = numpy.zeros([3,3,nsamples], numpy.float64)
+    u_kln = np.zeros([3,3,nsamples], np.float64)
     for sample in range(nsamples):
         positions = units.Quantity(x_n[sample,:,:], units.nanometers)
 
@@ -433,7 +431,7 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
         solvent_state = solvent_context.getState(getEnergy=True)
         u_kln[0,2,sample] = beta * solvent_state.getPotentialEnergy()
 
-    N_k = numpy.zeros([nstates], numpy.int32)
+    N_k = np.zeros([nstates], np.int32)
     N_k[0] = nsamples
 
 
