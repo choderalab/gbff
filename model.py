@@ -20,9 +20,18 @@ class GBFFModel(object):
         ngbmodels : int, optional
             The number of GB models to sample. Default 3
         """
+
+        for (key, value) in initial_parameters.iteritems():
+            (atomtype, parameter_name) = key.split('_')
+            if parameter_name == 'scalingFactor':
+                stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
+            elif parameter_name == 'radius':
+                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
+            else:
+                raise Exception("Unrecognized parameter name: %s" % parameter_name)
+            setattr(self, key, stochastic)
+
         self.ngbmodels = ngbmodels
-
-
         gbmodel_dir = pymc.Dirichlet('gbmodel_dir', np.ones([ngbmodels]))
         self.gbmodel_prior = pymc.CompletedDirichlet('gbmodel_prior', gbmodel_dir)
         self.gbmodel = pymc.Categorical('gbmodel', p=self.gbmodel_prior)
