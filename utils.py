@@ -23,11 +23,7 @@ import string
 import os
 import os.path
 import time
-import math
 import copy
-import tempfile
-
-from optparse import OptionParser # For parsing of command line arguments
 
 import numpy
 
@@ -36,21 +32,11 @@ import simtk.unit as units
 import simtk.openmm.app as app
 
 import openeye.oechem
-import openeye.oeomega
-import openeye.oequacpac
 
 # OpenEye toolkit
 from openeye import oechem
-from openeye import oequacpac
-from openeye import oeiupac
-from openeye import oeomega
-import gaff2xml
-import pymc
-import shutil
 import numpy as np
 import numpy.linalg as linalg
-
-import pymbar
 
 #=============================================================================================
 # Constants
@@ -652,69 +638,22 @@ def create_openmm_systems(database, verbose=False):
     database : dict
         The FreeSolv database dict containing OpenMM systems for each molecule
     """
-    charge_method = None #the charges should already be assigned
-    if verbose:
-        print("Running antechamber")
-    original_directory = os.getcwd()
-    working_directory = tempfile.mkdtemp()
-    os.chdir(working_directory)
-    start_time = time.time()
-    problematic_cids = list() # list of cid entries that must be removed
-    for cid in database.keys():
-        entry = database[cid]
-        molecule = entry['molecule']
+    print("Creating")
+    for cid, entry in database.items():
 
-        if verbose:
-            print("  " + molecule.GetTitle())
+        prmtop_filename = "./data/gaff_mol2/%s.prmtop" % cid
+        inpcrd_filename = "./data/gaff_mol2/%s.inpcrd" % cid
+        # Create OpenMM System object for molecule in vacuum.
+        prmtop = app.AmberPrmtopFile(prmtop_filename)
+        inpcrd = app.AmberInpcrdFile(inpcrd_filename)
+        system = prmtop.createSystem(nonbondedMethod=app.NoCutoff, constraints=app.HBonds, implicitSolvent=None, removeCMMotion=False)
+        positions = inpcrd.getPositions()
 
-        tripos_mol2_filename = 'molecule.tripos.mol2'
-        omolstream = oechem.oemolostream(tripos_mol2_filename)
-        oechem.OEWriteMolecule(omolstream, molecule)
-        omolstream.close()
-
-        try:
-            # Parameterize for AMBER.
-            molecule_name = 'molecule'
-            [gaff_mol2_filename, frcmod_filename] = gaff2xml.utils.run_antechamber(molecule_name, tripos_mol2_filename, charge_method=charge_method)
-            [prmtop_filename, inpcrd_filename] = gaff2xml.utils.run_tleap(molecule_name, gaff_mol2_filename, frcmod_filename)
-
-            # Create OpenMM System object for molecule in vacuum.
-            prmtop = app.AmberPrmtopFile(prmtop_filename)
-            inpcrd = app.AmberInpcrdFile(inpcrd_filename)
-            system = prmtop.createSystem(nonbondedMethod=app.NoCutoff, constraints=app.HBonds, implicitSolvent=None, removeCMMotion=False)
-            positions = inpcrd.getPositions()
-
-            # Store system and positions.
-            entry['system'] = system
-            entry['positions'] = positions
-            #TODO: verify that oemol and prmtop atoms match
-        except Exception as e:
-            print e
-            problematic_cids.append(cid)
-
-        # Unlink files.
-        for filename in os.listdir(working_directory):
-            os.unlink(filename)
-
-    os.chdir(original_directory)
-    shutil.rmtree(working_directory)
-
-    print("Problematic molecules: %s" % str(problematic_cids))
-    outfile = open('removed-molecules.txt', 'w')
-    for cid in problematic_cids:
-        iupac = database[cid]['iupac']
-        outfile.write('%s %s\n' % (cid, iupac))
-        del database[cid]
-    outfile.close()
-
-    if verbose:
-        print "%d systems attmpted" % len(database.keys())
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print "%.3f s elapsed" % elapsed_time
+        # Store system and positions.
+        entry['system'] = system
+        entry['positions'] = positions
 
     return database
-
 
 def type_atoms(database, atomtypes_filename, verbose=False):
     """
@@ -772,7 +711,3 @@ def type_atoms(database, atomtypes_filename, verbose=False):
         print("%.3f s elapsed" % elapsed_time)
 
     return database
-
-
-
-
