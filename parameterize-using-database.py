@@ -21,36 +21,18 @@ The AtomTyper class is based on 'patty' by Pat Walters, Vertex Pharmaceuticals.
 # GLOBAL IMPORTS
 #=============================================================================================
 
-import sys
-import string
 import os
 import os.path
 import time
 import math
-import copy
-import tempfile
 
 from optparse import OptionParser # For parsing of command line arguments
 
 import numpy
 
-import simtk.openmm as openmm
 import simtk.unit as units
-import simtk.openmm.app as app
-
-import openeye.oechem
-import openeye.oeomega
-import openeye.oequacpac
-
-# OpenEye toolkit
-from openeye import oechem
-from openeye import oequacpac
-from openeye import oeiupac
-from openeye import oeomega
 
 import pymc
-
-import pymbar
 
 import utils
 
@@ -273,6 +255,5 @@ if __name__=="__main__":
     from pymc import MCMC
     sampler = MCMC(model, db='hdf5', dbname=mcmcDbName)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
-    sampler.sample(iter=mcmcIterations, burn=0, save_interval=1, verbose=True, progress_bar=True)
+    sampler.sample(iter=mcmcIterations, burn=0, verbose=True, progress_bar=True)
     sampler.db.close()
-

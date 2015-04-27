@@ -23,11 +23,7 @@ import string
 import os
 import os.path
 import time
-import math
 import copy
-import tempfile
-
-from optparse import OptionParser # For parsing of command line arguments
 
 import numpy
 
@@ -36,21 +32,11 @@ import simtk.unit as units
 import simtk.openmm.app as app
 
 import openeye.oechem
-import openeye.oeomega
-import openeye.oequacpac
 
 # OpenEye toolkit
 from openeye import oechem
-from openeye import oequacpac
-from openeye import oeiupac
-from openeye import oeomega
-import gaff2xml
-import pymc
-import shutil
 import numpy as np
 import numpy.linalg as linalg
-
-import pymbar
 
 #=============================================================================================
 # Constants
@@ -636,7 +622,7 @@ def load_database(database, mol2_directory, verbose=False):
             print "%.3f s elapsed" % elapsed_time
     return database
 
-def create_openmm_systems(database, verbose=False):
+def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
     """
     Create an OpenMM system for each molecule in the database
 
@@ -646,75 +632,37 @@ def create_openmm_systems(database, verbose=False):
         dict containing FreeSolv molecules (prepared using prepare_database)
     verbose : Boolean, optional
         verbosity
+    path_to_prmtops : str, optional, default=None
+        Path to directory containing inpcrd and prmtop files.
+        If None, will be set to ${FREESOLV_PATH}/mol2files_gaff/
 
     Returns
     -------
     database : dict
         The FreeSolv database dict containing OpenMM systems for each molecule
     """
-    charge_method = None #the charges should already be assigned
-    if verbose:
-        print("Running antechamber")
-    original_directory = os.getcwd()
-    working_directory = tempfile.mkdtemp()
-    os.chdir(working_directory)
-    start_time = time.time()
-    problematic_cids = list() # list of cid entries that must be removed
-    for cid in database.keys():
-        entry = database[cid]
-        molecule = entry['molecule']
+    print("Creating")
+    
+    if path_to_prmtops is None:
+        FREESOLV_PATH = os.environ["FREESOLV_PATH"]
+        path_to_prmtops = os.path.join(FREESOLV_PATH + "/mol2files_gaff/")
 
-        if verbose:
-            print("  " + molecule.GetTitle())
+    for cid, entry in database.items():
 
-        tripos_mol2_filename = 'molecule.tripos.mol2'
-        omolstream = oechem.oemolostream(tripos_mol2_filename)
-        oechem.OEWriteMolecule(omolstream, molecule)
-        omolstream.close()
+        prmtop_filename = os.path.join(path_to_prmtops, "%s.prmtop" % cid)
+        inpcrd_filename = os.path.join(path_to_prmtops, "%s.inpcrd" % cid)
+        
+        # Create OpenMM System object for molecule in vacuum.
+        prmtop = app.AmberPrmtopFile(prmtop_filename)
+        inpcrd = app.AmberInpcrdFile(inpcrd_filename)
+        system = prmtop.createSystem(nonbondedMethod=app.NoCutoff, constraints=app.HBonds, implicitSolvent=None, removeCMMotion=False)
+        positions = inpcrd.getPositions()
 
-        try:
-            # Parameterize for AMBER.
-            molecule_name = 'molecule'
-            [gaff_mol2_filename, frcmod_filename] = gaff2xml.utils.run_antechamber(molecule_name, tripos_mol2_filename, charge_method=charge_method)
-            [prmtop_filename, inpcrd_filename] = gaff2xml.utils.run_tleap(molecule_name, gaff_mol2_filename, frcmod_filename)
-
-            # Create OpenMM System object for molecule in vacuum.
-            prmtop = app.AmberPrmtopFile(prmtop_filename)
-            inpcrd = app.AmberInpcrdFile(inpcrd_filename)
-            system = prmtop.createSystem(nonbondedMethod=app.NoCutoff, constraints=app.HBonds, implicitSolvent=None, removeCMMotion=False)
-            positions = inpcrd.getPositions()
-
-            # Store system and positions.
-            entry['system'] = system
-            entry['positions'] = positions
-            #TODO: verify that oemol and prmtop atoms match
-        except Exception as e:
-            print e
-            problematic_cids.append(cid)
-
-        # Unlink files.
-        for filename in os.listdir(working_directory):
-            os.unlink(filename)
-
-    os.chdir(original_directory)
-    shutil.rmtree(working_directory)
-
-    print("Problematic molecules: %s" % str(problematic_cids))
-    outfile = open('removed-molecules.txt', 'w')
-    for cid in problematic_cids:
-        iupac = database[cid]['iupac']
-        outfile.write('%s %s\n' % (cid, iupac))
-        del database[cid]
-    outfile.close()
-
-    if verbose:
-        print "%d systems attmpted" % len(database.keys())
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print "%.3f s elapsed" % elapsed_time
+        # Store system and positions.
+        entry['system'] = system
+        entry['positions'] = positions
 
     return database
-
 
 def type_atoms(database, atomtypes_filename, verbose=False):
     """
@@ -772,7 +720,3 @@ def type_atoms(database, atomtypes_filename, verbose=False):
         print("%.3f s elapsed" % elapsed_time)
 
     return database
-
-
-
-

@@ -1,6 +1,9 @@
 """
 Use the gaff2xml wrappers of OpenEye and Antechamber to rebuild input files
 for the FreeSolv database.
+
+Looks for freesolve database using environment variable FREESOLV_PATH
+Outputs two LOCAL directories of files: ./tripos_mol2/ and ./mol2files_gaff/
 """
 
 import pickle
@@ -17,10 +20,10 @@ for (key, entry) in database.items():
     print "Processing molecule %s ..." % (key)
     
     tripos_filename = os.path.join('tripos_mol2', key + '.mol2')
-    frcmod_filename = os.path.join("./gaff_mol2/", "%s.frcmod" % key)
-    gaff_mol2_filename = os.path.join("./gaff_mol2/", "%s.mol2" % key)
-    prmtop_filename = os.path.join("./gaff_mol2/", "%s.prmtop" % key)
-    inpcrd_filename = os.path.join("./gaff_mol2/", "%s.inpcrd" % key)
+    frcmod_filename = os.path.join("./mol2files_gaff/", "%s.frcmod" % key)
+    gaff_mol2_filename = os.path.join("./mol2files_gaff/", "%s.mol2" % key)
+    prmtop_filename = os.path.join("./mol2files_gaff/", "%s.prmtop" % key)
+    inpcrd_filename = os.path.join("./mol2files_gaff/", "%s.inpcrd" % key)
 
     molecule = gaff2xml.openeye.smiles_to_oemol(entry['smiles'])
     charged = gaff2xml.openeye.get_charges(molecule)
