@@ -28,7 +28,7 @@ import math
 
 from optparse import OptionParser # For parsing of command line arguments
 
-import numpy
+import numpy as np
 
 import simtk.unit as units
 
@@ -59,8 +59,8 @@ def create_model(database, initial_parameters):
 
     # Define prior on GB models.
     ngbmodels = 3 # number of GB models
-    #all_models = numpy.ones([ngbmodels], numpy.float64) / float(ngbmodels)
-    model['gbmodel_dir'] = pymc.Dirichlet('gbmodel_dir', numpy.ones([ngbmodels]))
+    #all_models = np.ones([ngbmodels], np.float64) / float(ngbmodels)
+    model['gbmodel_dir'] = pymc.Dirichlet('gbmodel_dir', np.ones([ngbmodels]))
     model['gbmodel_prior'] = pymc.CompletedDirichlet('gbmodel_prior', model['gbmodel_dir'])
     model['gbmodel'] = pymc.Categorical('gbmodel', p=model['gbmodel_prior'])
 
@@ -121,13 +121,13 @@ def create_model(database, initial_parameters):
     parents = {'dg_gbsa_%s'%cid : model['dg_gbsa_%s' % cid] for cid in cid_list }
     def RMSE(**args):
         nmolecules = len(cid_list)
-        error = numpy.zeros([nmolecules], numpy.float64)
+        error = np.zeros([nmolecules], np.float64)
         for (molecule_index, cid) in enumerate(cid_list):
             entry = database[cid]
             molecule = entry['molecule']
             error[molecule_index] = args['dg_gbsa_%s' % cid] - float(entry['expt'])
-        mse = numpy.mean((error - numpy.mean(error))**2)
-        return numpy.sqrt(mse)
+        mse = np.mean((error - np.mean(error))**2)
+        return np.sqrt(mse)
 
     model['RMSE'] = pymc.Deterministic(eval=RMSE,
                                        name='RMSE',
@@ -231,7 +231,7 @@ if __name__=="__main__":
     print "%.3f s elapsed" % elapsed_time
 
     # Print comparison.
-    signed_errors = numpy.zeros([len(database.keys())], numpy.float64)
+    signed_errors = np.zeros([len(database.keys())], np.float64)
     for (i, (cid, entry)) in enumerate(database.items()):
         # Get metadata.
         molecule = entry['molecule']
