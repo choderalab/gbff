@@ -622,7 +622,7 @@ def load_database(database, mol2_directory, verbose=False):
             print "%.3f s elapsed" % elapsed_time
     return database
 
-def create_openmm_systems(database, verbose=False):
+def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
     """
     Create an OpenMM system for each molecule in the database
 
@@ -632,6 +632,9 @@ def create_openmm_systems(database, verbose=False):
         dict containing FreeSolv molecules (prepared using prepare_database)
     verbose : Boolean, optional
         verbosity
+    path_to_prmtops : str, optional, default=None
+        Path to directory containing inpcrd and prmtop files.
+        If None, will be set to ${FREESOLV_PATH}/mol2files_gaff/
 
     Returns
     -------
@@ -639,10 +642,16 @@ def create_openmm_systems(database, verbose=False):
         The FreeSolv database dict containing OpenMM systems for each molecule
     """
     print("Creating")
+    
+    if path_to_prmtops is None:
+        FREESOLV_PATH = os.environ["FREESOLV_PATH"]
+        path_to_prmtops = os.path.join(FREESOLV_PATH + "/mol2files_gaff/")
+
     for cid, entry in database.items():
 
-        prmtop_filename = "./data/gaff_mol2/%s.prmtop" % cid
-        inpcrd_filename = "./data/gaff_mol2/%s.inpcrd" % cid
+        prmtop_filename = os.path.join(path_to_prmtops, "%s.prmtop" % cid)
+        inpcrd_filename = os.path.join(path_to_prmtops, "%s.inpcrd" % cid)
+        
         # Create OpenMM System object for molecule in vacuum.
         prmtop = app.AmberPrmtopFile(prmtop_filename)
         inpcrd = app.AmberInpcrdFile(inpcrd_filename)
