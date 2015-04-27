@@ -232,13 +232,12 @@ if __name__=="__main__":
 
     # Print comparison.
     signed_errors = numpy.zeros([len(database.keys())], numpy.float64)
-    for (i, cid) in enumerate(database.keys()):
+    for (i, (cid, entry)) in enumerate(database.items()):
         # Get metadata.
-        entry = database[cid]
         molecule = entry['molecule']
         name = molecule.GetTitle()
-        dg_exp           = float(molecule.GetData('expt')) * units.kilocalories_per_mole
-        ddg_exp          = float(molecule.GetData('d_expt')) * units.kilocalories_per_mole
+        dg_exp           = float(entry['expt']) * units.kilocalories_per_mole
+        ddg_exp          = float(entry['d_expt']) * units.kilocalories_per_mole
         signed_errors[i] = energies[molecule] / units.kilocalories_per_mole - dg_exp / units.kilocalories_per_mole
 
         # Form output.
