@@ -110,8 +110,8 @@ def create_model(database, initial_parameters):
 
         molecule_name          = molecule.GetTitle()
         variable_name          = "dg_exp_%s" % cid
-        dg_exp                 = float(molecule.GetData('expt')) # observed hydration free energy in kcal/mol
-        ddg_exp                 = float(molecule.GetData('d_expt')) # observed hydration free energy uncertainty in kcal/mol
+        dg_exp                 = float(entry['expt']) # observed hydration free energy in kcal/mol
+        ddg_exp                 = float(entry['d_expt']) # observed hydration free energy uncertainty in kcal/mol
         #model[variable_name]   = pymc.Normal(variable_name, mu=model['dg_gbsa_%08d' % molecule_index], tau=model['tau'], value=expt, observed=True)
         model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=model['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
         #model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=model['sigma'] : 1.0 / (ddg_exp**2) ) # Do not include model error.
@@ -125,7 +125,7 @@ def create_model(database, initial_parameters):
         for (molecule_index, cid) in enumerate(cid_list):
             entry = database[cid]
             molecule = entry['molecule']
-            error[molecule_index] = args['dg_gbsa_%s' % cid] - float(molecule.GetData('expt'))
+            error[molecule_index] = args['dg_gbsa_%s' % cid] - float(entry['expt'])
         mse = numpy.mean((error - numpy.mean(error))**2)
         return numpy.sqrt(mse)
 
@@ -232,13 +232,12 @@ if __name__=="__main__":
 
     # Print comparison.
     signed_errors = numpy.zeros([len(database.keys())], numpy.float64)
-    for (i, cid) in enumerate(database.keys()):
+    for (i, (cid, entry)) in enumerate(database.items()):
         # Get metadata.
-        entry = database[cid]
         molecule = entry['molecule']
         name = molecule.GetTitle()
-        dg_exp           = float(molecule.GetData('expt')) * units.kilocalories_per_mole
-        ddg_exp          = float(molecule.GetData('d_expt')) * units.kilocalories_per_mole
+        dg_exp           = float(entry['expt']) * units.kilocalories_per_mole
+        ddg_exp          = float(entry['d_expt']) * units.kilocalories_per_mole
         signed_errors[i] = energies[molecule] / units.kilocalories_per_mole - dg_exp / units.kilocalories_per_mole
 
         # Form output.
