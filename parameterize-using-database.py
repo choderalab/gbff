@@ -255,5 +255,5 @@ if __name__=="__main__":
     from pymc import MCMC
     sampler = MCMC(model, db='hdf5', dbname=mcmcDbName)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
-    sampler.sample(iter=mcmcIterations, burn=0, save_interval=1, verbose=True, progress_bar=True)
+    sampler.sample(iter=mcmcIterations, burn=0, verbose=True, progress_bar=True)
     sampler.db.close()
