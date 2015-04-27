@@ -2,7 +2,7 @@ __author__ = 'Patrick B. Grinaway'
 
 import pymc
 import numpy as np
-
+import math
 
 class GBFFModel(object):
     """
@@ -11,7 +11,6 @@ class GBFFModel(object):
 
     def __init__(self, database, initial_parameters, ngbmodels=3):
         """
-
         Arguments
         ---------
         database : dict
@@ -21,6 +20,17 @@ class GBFFModel(object):
         ngbmodels : int, optional
             The number of GB models to sample. Default 3
         """
+        self.ngbmodels = ngbmodels
 
-    self.ngbmodels = ngbmodels
-    
+
+        gbmodel_dir = pymc.Dirichlet('gbmodel_dir', np.ones([ngbmodels]))
+        self.gbmodel_prior = pymc.CompletedDirichlet('gbmodel_prior', gbmodel_dir)
+        self.gbmodel = pymc.Categorical('gbmodel', p=self.gbmodel_prior)
+
+
+        log_sigma_min = math.log(0.01) # kcal/mol
+        log_sigma_max = math.log(10.0) # kcal/mol
+        log_sigma_guess = math.log(0.2)
+        self.log_sigma = pymc.Uniform('log_sigma', lower=log_sigma_min, upper=log_sigma_max, value=log_sigma_guess)
+        self.sigma = pymc.Lambda('sigma', lambda log_sigma=self.log_sigma : math.exp(log_sigma))
+        self.tau = pymc.Lambda('tau', lambda sigma=self.sigma: sigma**(-2))
