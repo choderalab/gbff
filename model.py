@@ -90,6 +90,7 @@ class GBFFModel(object):
         gbffmodel['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents=RMSE_parents, doc='RMSE', dtype=float, trace=True, verbose=1)
         return gbffmodel
 
+
     def _create_solvated_systems(self, database, initial_parameters):
         """
         Generate a system with the appropriate GB force added to prevent recompilation. Specific
@@ -127,7 +128,6 @@ class GBFFModel(object):
         """
         raise NotImplementedError
 
-
     def _create_molecule_error_model(self, database):
 
         """
@@ -139,18 +139,18 @@ class GBFFModel(object):
 
         """
         molecule_error_model = dict()
-
+        parents = dict()
         cid_list = database.keys()
         for (molecule_index, cid) in enumerate(cid_list):
             entry = database[cid]
             dg_exp_name = "dg_exp_%s" % cid
             dg_gbsa_name = "dg_gbsa_%s" % cid
             parents = self._get_parameters_of_molecule(entry['molecule'])
-            molecule_error_model[dg_gbsa_name] = pymc.Deterministic(eval=self.hydration_energy_function,doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
             dg_exp = float(entry['expt']) # observed hydration free energy in kcal/mol
             ddg_exp = float(entry['d_expt']) # observed hydration free energy uncertainty in kcal/mol
             molecule_error_model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=molecule_error_model['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
             molecule_error_model[dg_exp_name] = pymc.Normal(dg_exp_name, mu=molecule_error_model['dg_gbsa_%s' % cid], tau=molecule_error_model['tau_%s' % cid], value=dg_exp, observed=True)
+            molecule_error_model[dg_gbsa_name] = pymc.Deterministic(eval=self.hydration_energy_function, doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
         return molecule_error_model
 
     def _get_parameters_of_molecule(self, mol):
@@ -169,22 +169,43 @@ class GBFFModel(object):
         """
         parents = dict()
         for atom in mol.GetAtoms():
-            atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
+            atomtype = atom.GetStringData("gbsa_type")
             for parameter_name in self.parameter_types:
                 stochastic_name = '%s_%s' % (atomtype,parameter_name)
                 parents[stochastic_name] = self.parameter_model[stochastic_name]
         return parents
 
+    @property
+    def pymc_model(self):
+        return self.model
 
 
-class GBFFHCTModel(GBFFModel):
+class GBFFThreeParameterModel(GBFFModel):
     """
-    A class that samples within the GBSA HCT model
+    A class that samples within the GBSA HCT, OBC1, OBC2 models
     """
+
+    def __init__(self, database, initial_parameters, hydration_energy_function, gbmodel):
+        """
+        Arguments
+        ---------
+        database : dict
+            Database of FreeSolv solvation free energy data
+        initial_parameters : dict
+            Dict containing the starting set of parameters for the model
+        hydration_energy_function : function
+            The function to use in computing the energies of molecules
+        gbmodel : int
+            Select HCT, OBC1, or OBC2 using 1, 2, 3
+        """
+        self.gbmodel = gbmodel
+        parameter_types = ['radius', 'scalingFactor']
+        super(GBFFThreeParameterModel, self).__init__(database, initial_parameters, parameter_types, hydration_energy_function)
+
 
     def _create_solvated_systems(self, database, initial_parameters):
         """
-        Create the solvated systems for the GB-HCT model
+        Create the solvated systems for the GB-HCT, OBC1, or OBC2 models
 
         Arguments
         ---------
@@ -202,7 +223,14 @@ class GBFFHCTModel(GBFFModel):
             solvent_system = copy.deepcopy(entry['system'])
             forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
             nonbonded_force = forces['NonbondedForce']
-            gbsa_force = customgbforces.GBSAHCTForce(SA='ACE')
+            if self.gbmodel == 1:
+                gbsa_force = customgbforces.GBSAHCTForce(SA='ACE')
+            elif self.gbmodel == 2:
+                gbsa_force = customgbforces.GBSAOBC1Force(SA='ACE')
+            elif self.gbmodel == 3:
+                gbsa_force = customgbforces.GBSAOBC2Force(SA='ACE')
+            else:
+                raise ValueError("Unsupported GBmodel %i selected" % self.gbmodel)
             atoms = [atom for atom in molecule.GetAtoms()]
             for (atom_index, atom) in enumerate(atoms):
                 [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
@@ -244,6 +272,7 @@ class GBFFHCTModel(GBFFModel):
                 raise Exception("Unrecognized parameter name: %s" % parameter_name)
             parameters[key] = stochastic
         return parameters
+
 
 
 
