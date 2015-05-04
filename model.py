@@ -277,3 +277,73 @@ class GBFFThreeParameterModel(GBFFModel):
 
 
 
+class GBFFGBnModel(GBFFModel):
+    """
+    A class to sample the parameters of the GBSAGBn model
+    """
+
+    def _create_solvated_systems(self, database, initial_parameters):
+        """
+        Create the solvated systems for the GB-HCT, OBC1, or OBC2 models
+
+        Arguments
+        ---------
+        database : dict
+            A dictionary of the FreeSolv database, prepared with vacuum openmm systems.
+        initial_parameters : dict
+            A dictionary of the initial parameters for the HCT force
+        """
+
+        cid_list = database.keys()
+
+        for (molecule_index, cid) in enumerate(cid_list):
+            entry = database[cid]
+            molecule = entry['molecule']
+            solvent_system = copy.deepcopy(entry['system'])
+            forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
+            nonbonded_force = forces['NonbondedForce']
+            atoms = [atom for atom in molecule.GetAtoms()]
+            gbsa_force = customgbforces.GBSAGBnForce(SA='ACE')
+            for (atom_index, atom) in enumerate(atoms):
+                [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
+                atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
+                radius = initial_parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
+                scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
+                gbsa_force.addParticle([charge, radius, scalingFactor])
+            solvent_system.addForce(gbsa_force)
+            entry['solvated_system'] = solvent_system
+            database[cid] = entry
+        return database
+
+    def _create_parameter_model(self, database, initial_parameters):
+        """
+        Creates set of stochastics representing the HCT parameters
+
+        Arguments
+        ---------
+        database : dict
+            FreeSolv database
+        initial_parameters : dict
+            The set of initial values of the parameters
+
+        Returns
+        -------
+        parameters : dict
+            PyMC dictionary containing the parameters to sample.\
+        """
+
+        parameters = dict() # just the parameters
+        for (key, value) in initial_parameters.iteritems():
+            (atomtype, parameter_name) = key.split('_')
+            if parameter_name == 'scalingFactor':
+                stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
+            elif parameter_name == 'radius':
+                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
+            else:
+                raise Exception("Unrecognized parameter name: %s" % parameter_name)
+            parameters[key] = stochastic
+        return parameters
+
+
+
+
