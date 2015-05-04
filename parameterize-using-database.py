@@ -71,23 +71,23 @@ def create_model(database, initial_parameters):
         molecule = entry['molecule']
 
         molecule_name = molecule.GetTitle()
-        variable_name = "dg_gbsa_%s" % cid
+        dg_gbsa = "dg_gbsa_%s" % cid
         # Determine which parameters are involved in this molecule to limit number of parents for caching.
         parents = dict()
+
+        #add the parameters to a parents dict()
         for atom in molecule.GetAtoms():
             atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
             for parameter_name in ['scalingFactor', 'radius']:
                 stochastic_name = '%s_%s' % (atomtype,parameter_name)
                 parents[stochastic_name] = parameters[stochastic_name]
-        parents['gbmodel'] = model['gbmodel'] # add GB model choice
-        print "%s : " % molecule_name,
-        print parents.keys()
         hydration_energy_parameters = {}
-        hydration_energy_parameters['gbmodel'] = model['gbmodel']
-        # Create deterministic variable for computed hydration free energy.
+        #
+        # set each dg_gbsa, using the correct parameters and hydration energy calculation. better to do as array?
         function = utils.hydration_energy_factory(entry,hydration_energy_parameters)
-        model[variable_name] = pymc.Deterministic(eval=function,
-                                                  name=variable_name,
+
+        model[dg_gbsa] = pymc.Deterministic(eval=function,
+                                                  name=dg_gbsa,
                                                   parents=parents,
                                                   doc=cid,
                                                   trace=True,
@@ -103,22 +103,23 @@ def create_model(database, initial_parameters):
     model['log_sigma']         = pymc.Uniform('log_sigma', lower=log_sigma_min, upper=log_sigma_max, value=log_sigma_guess)
     model['sigma']             = pymc.Lambda('sigma', lambda log_sigma=model['log_sigma'] : math.exp(log_sigma) )
     model['tau']               = pymc.Lambda('tau', lambda sigma=model['sigma'] : sigma**(-2) )
+
+
+
     cid_list = database.keys()
     for (molecule_index, cid) in enumerate(cid_list):
         entry = database[cid]
-        molecule = entry['molecule']
-
-        molecule_name          = molecule.GetTitle()
         variable_name          = "dg_exp_%s" % cid
         dg_exp                 = float(entry['expt']) # observed hydration free energy in kcal/mol
         ddg_exp                 = float(entry['d_expt']) # observed hydration free energy uncertainty in kcal/mol
-        #model[variable_name]   = pymc.Normal(variable_name, mu=model['dg_gbsa_%08d' % molecule_index], tau=model['tau'], value=expt, observed=True)
         model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=model['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
-        #model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=model['sigma'] : 1.0 / (ddg_exp**2) ) # Do not include model error.
         model[variable_name]   = pymc.Normal(variable_name, mu=model['dg_gbsa_%s' % cid], tau=model['tau_%s' % cid], value=dg_exp, observed=True)
 
+
+    parents = {'dg_gbsa_%s'%cid : model['dg_gbsa_%s' % cid] for cid in cid_list}
+
+
     # Define convenience functions.
-    parents = {'dg_gbsa_%s'%cid : model['dg_gbsa_%s' % cid] for cid in cid_list }
     def RMSE(**args):
         nmolecules = len(cid_list)
         error = np.zeros([nmolecules], np.float64)
