@@ -39,6 +39,7 @@ class GBFFModel(object):
 
 
 
+
     def _create_bayesian_gbmodel(self, database, initial_parameters):
         """
         Generates the PyMC model to sample within one GB model (no Reversible Jump)
@@ -185,7 +186,7 @@ class GBFFThreeParameterModel(GBFFModel):
     A class that samples within the GBSA HCT, OBC1, OBC2 models
     """
 
-    def __init__(self, database, initial_parameters, hydration_energy_function, gbmodel):
+    def __init__(self, database, initial_parameters, hydration_energy_function, gbmodel=1):
         """
         Arguments
         ---------
@@ -196,7 +197,7 @@ class GBFFThreeParameterModel(GBFFModel):
         hydration_energy_function : function
             The function to use in computing the energies of molecules
         gbmodel : int
-            Select HCT, OBC1, or OBC2 using 1, 2, 3
+            Select HCT, OBC1, or OBC2 using 1, 2, 3. Default 1 (HTC)
         """
         self.gbmodel = gbmodel
         parameter_types = ['radius', 'scalingFactor']

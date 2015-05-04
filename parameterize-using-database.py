@@ -26,6 +26,8 @@ import os.path
 import time
 import math
 
+import model
+
 from optparse import OptionParser # For parsing of command line arguments
 
 import numpy as np
@@ -36,116 +38,7 @@ import pymc
 
 import utils
 
-#=============================================================================================
-# PyMC model
-#=============================================================================================
 
-
-def create_model(database, initial_parameters):
-
-    # Define priors for parameters.
-    model = dict()
-    parameters = dict() # just the parameters
-    for (key, value) in initial_parameters.iteritems():
-        (atomtype, parameter_name) = key.split('_')
-        if parameter_name == 'scalingFactor':
-            stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
-        elif parameter_name == 'radius':
-            stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
-        else:
-            raise Exception("Unrecognized parameter name: %s" % parameter_name)
-        model[key] = stochastic
-        parameters[key] = stochastic
-
-    # Define prior on GB models.
-    ngbmodels = 3 # number of GB models
-    #all_models = np.ones([ngbmodels], np.float64) / float(ngbmodels)
-    model['gbmodel_dir'] = pymc.Dirichlet('gbmodel_dir', np.ones([ngbmodels]))
-    model['gbmodel_prior'] = pymc.CompletedDirichlet('gbmodel_prior', model['gbmodel_dir'])
-    model['gbmodel'] = pymc.Categorical('gbmodel', p=model['gbmodel_prior'])
-
-    # Define deterministic functions for hydration free energies.
-    cid_list = database.keys()
-    for (molecule_index, cid) in enumerate(cid_list):
-        entry = database[cid]
-        molecule = entry['molecule']
-
-        molecule_name = molecule.GetTitle()
-        dg_gbsa = "dg_gbsa_%s" % cid
-        # Determine which parameters are involved in this molecule to limit number of parents for caching.
-        parents = dict()
-
-        #add the parameters to a parents dict()
-        for atom in molecule.GetAtoms():
-            atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
-            for parameter_name in ['scalingFactor', 'radius']:
-                stochastic_name = '%s_%s' % (atomtype,parameter_name)
-                parents[stochastic_name] = parameters[stochastic_name]
-        hydration_energy_parameters = {}
-        #
-        # set each dg_gbsa, using the correct parameters and hydration energy calculation. better to do as array?
-        function = utils.hydration_energy_factory(entry,hydration_energy_parameters)
-
-        model[dg_gbsa] = pymc.Deterministic(eval=function,
-                                                  name=dg_gbsa,
-                                                  parents=parents,
-                                                  doc=cid,
-                                                  trace=True,
-                                                  verbose=1,
-                                                  dtype=float,
-                                                  plot=False,
-                                                  cache_depth=2)
-
-    # Define error model
-    log_sigma_min              = math.log(0.01) # kcal/mol
-    log_sigma_max              = math.log(10.0) # kcal/mol
-    log_sigma_guess            = math.log(0.2) # kcal/mol
-    model['log_sigma']         = pymc.Uniform('log_sigma', lower=log_sigma_min, upper=log_sigma_max, value=log_sigma_guess)
-    model['sigma']             = pymc.Lambda('sigma', lambda log_sigma=model['log_sigma'] : math.exp(log_sigma) )
-    model['tau']               = pymc.Lambda('tau', lambda sigma=model['sigma'] : sigma**(-2) )
-
-
-
-    cid_list = database.keys()
-    for (molecule_index, cid) in enumerate(cid_list):
-        entry = database[cid]
-        variable_name          = "dg_exp_%s" % cid
-        dg_exp                 = float(entry['expt']) # observed hydration free energy in kcal/mol
-        ddg_exp                 = float(entry['d_expt']) # observed hydration free energy uncertainty in kcal/mol
-        model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=model['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
-        model[variable_name]   = pymc.Normal(variable_name, mu=model['dg_gbsa_%s' % cid], tau=model['tau_%s' % cid], value=dg_exp, observed=True)
-
-
-    parents = {'dg_gbsa_%s'%cid : model['dg_gbsa_%s' % cid] for cid in cid_list}
-
-
-    # Define convenience functions.
-    def RMSE(**args):
-        nmolecules = len(cid_list)
-        error = np.zeros([nmolecules], np.float64)
-        for (molecule_index, cid) in enumerate(cid_list):
-            entry = database[cid]
-            molecule = entry['molecule']
-            error[molecule_index] = args['dg_gbsa_%s' % cid] - float(entry['expt'])
-        mse = np.mean((error - np.mean(error))**2)
-        return np.sqrt(mse)
-
-    model['RMSE'] = pymc.Deterministic(eval=RMSE,
-                                       name='RMSE',
-                                       parents=parents,
-                                       doc='RMSE',
-                                       trace=True,
-                                       verbose=1,
-                                       dtype=float,
-                                       plot=True,
-                                       cache_depth=2)
-
-    return model
-
-def print_file(filename):
-    infile = open(filename, 'r')
-    print infile.read()
-    infile.close()
 
 #=============================================================================================
 # MAIN
@@ -249,11 +142,11 @@ if __name__=="__main__":
     print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
 
     # Create MCMC model.
-    model = create_model(database, parameters)
+    obc1model = model.GBFFThreeParameterModel(database, parameters, utils.compute_hydration_energy, 2)
 
     # Sample models.
     from pymc import MCMC
-    sampler = MCMC(model, db='hdf5', dbname=mcmcDbName)
+    sampler = MCMC(obc1model.pymc_model, db='hdf5', dbname=mcmcDbName)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
     sampler.sample(iter=mcmcIterations, burn=0, verbose=True, progress_bar=True)
     sampler.db.close()
