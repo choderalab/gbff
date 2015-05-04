@@ -3,6 +3,10 @@ __author__ = 'Patrick B. Grinaway'
 import pymc
 import numpy as np
 import math
+import copy
+import simtk.unit as units
+import simtk.openmm as openmm
+import simtk.openmm.app.internal.customgbforces as customgbforces
 
 
 class GBFFModel(object):
@@ -77,12 +81,14 @@ class GBFFModel(object):
         gbffmodel['sigma'] = pymc.Lambda('sigma', lambda log_sigma=gbffmodel['log_sigma'] : math.exp(log_sigma))
         gbffmodel['tau'] = pymc.Lambda('tau', lambda sigma=gbffmodel['sigma']: sigma**(-2))
 
+        gbffmodel.update(self.parameter_model)
         molecule_error_model = self._create_molecule_error_model(database)
         gbffmodel.update(molecule_error_model)
 
+
         RMSE_parents = {'dg_gbsa_%s'%cid : gbffmodel['dg_gbsa_%s' % cid] for cid in cid_list}
         gbffmodel['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents=RMSE_parents, doc='RMSE', dtype=float, trace=True, verbose=1)
-
+        return gbffmodel
 
     def _create_solvated_systems(self, database, initial_parameters):
         """
@@ -176,7 +182,68 @@ class GBFFHCTModel(GBFFModel):
     A class that samples within the GBSA HCT model
     """
 
-    def __init__(self, database, initial_parameters, hydration_energy_function):
+    def _create_solvated_systems(self, database, initial_parameters):
+        """
+        Create the solvated systems for the GB-HCT model
+
+        Arguments
+        ---------
+        database : dict
+            A dictionary of the FreeSolv database, prepared with vacuum openmm systems.
+        initial_parameters : dict
+            A dictionary of the initial parameters for the HCT force
+        """
+
+        cid_list = database.keys()
+
+        for (molecule_index, cid) in enumerate(cid_list):
+            entry = database[cid]
+            molecule = entry['molecule']
+            solvent_system = copy.deepcopy(entry['system'])
+            forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
+            nonbonded_force = forces['NonbondedForce']
+            gbsa_force = customgbforces.GBSAHCTForce(SA='ACE')
+            atoms = [atom for atom in molecule.GetAtoms()]
+            for (atom_index, atom) in enumerate(atoms):
+                [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
+                atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
+                radius = initial_parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
+                scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
+                gbsa_force.addParticle([charge, radius, scalingFactor])
+            solvent_system.addForce(gbsa_force)
+            entry['solvated_system'] = solvent_system
+            database[cid] = entry
+
+        return database
+
+    def _create_parameter_model(self, database, initial_parameters):
+        """
+        Creates set of stochastics representing the HCT parameters
+
+        Arguments
+        ---------
+        database : dict
+            FreeSolv database
+        initial_parameters : dict
+            The set of initial values of the parameters
+
+        Returns
+        -------
+        parameters : dict
+            PyMC dictionary containing the parameters to sample.\
+        """
+
+        parameters = dict() # just the parameters
+        for (key, value) in initial_parameters.iteritems():
+            (atomtype, parameter_name) = key.split('_')
+            if parameter_name == 'scalingFactor':
+                stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
+            elif parameter_name == 'radius':
+                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
+            else:
+                raise Exception("Unrecognized parameter name: %s" % parameter_name)
+            parameters[key] = stochastic
+        return parameters
 
 
 
