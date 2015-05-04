@@ -347,3 +347,42 @@ class GBFFGBnModel(GBFFModel):
 
 
 
+class GBFFGBn2Model(GBFFModel):
+    """
+    A class that representes a Python object to sample over parameters for the GBn2 model
+    """
+
+    def _create_solvated_systems(self, database, initial_parameters):
+        """
+        Create the solvated systems for the GBn2 model
+
+        Arguments
+        ---------
+        database : dict
+            A dictionary of the FreeSolv database, prepared with vacuum openmm systems.
+        initial_parameters : dict
+            A dictionary of the initial parameters for the HCT force
+        """
+        cid_list = database.keys()
+
+        for (molecule_index, cid) in enumerate(cid_list):
+            entry = database[cid]
+            molecule = entry['molecule']
+            solvent_system = copy.deepcopy(entry['system'])
+            forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
+            nonbonded_force = forces['NonbondedForce']
+            atoms = [atom for atom in molecule.GetAtoms()]
+            gbsa_force = customgbforces.GBSAGBnForce(SA='ACE')
+            for (atom_index, atom) in enumerate(atoms):
+                [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
+                atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
+                radius = initial_parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
+                scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
+                alpha = initial_parameters['%s_%s' %(atomtype, 'alpha')]
+                beta = initial_parameters['%s_%s' %(atomtype, 'beta')]
+                gamma = initial_parameters['%s_%s' %(atomtype, 'gamma')]
+                gbsa_force.addParticle([charge, radius, scalingFactor, alpha, beta, gamma])
+            solvent_system.addForce(gbsa_force)
+            entry['solvated_system'] = solvent_system
+            database[cid] = entry
+        return database
