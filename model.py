@@ -5,7 +5,6 @@ import numpy as np
 import math
 import copy
 import simtk.unit as units
-import simtk.openmm as openmm
 import simtk.openmm.app.internal.customgbforces as customgbforces
 
 
