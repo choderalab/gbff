@@ -386,3 +386,38 @@ class GBFFGBn2Model(GBFFModel):
             entry['solvated_system'] = solvent_system
             database[cid] = entry
         return database
+
+    def _create_parameter_model(self, database, initial_parameters):
+        """
+        Creates set of stochastics representing the HCT parameters
+
+        Arguments
+        ---------
+        database : dict
+            FreeSolv database
+        initial_parameters : dict
+            The set of initial values of the parameters
+
+        Returns
+        -------
+        parameters : dict
+            PyMC dictionary containing the parameters to sample.\
+        """
+        uninformative_tau = 0.0001
+        parameters = dict() # just the parameters
+        for (key, value) in initial_parameters.iteritems():
+            (atomtype, parameter_name) = key.split('_')
+            if parameter_name == 'scalingFactor':
+                stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
+            elif parameter_name == 'radius':
+                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
+            elif parameter_name == 'alpha':
+                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+            elif parameter_name == 'beta':
+                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+            elif parameter_name == 'gamma':
+                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+            else:
+                raise Exception("Unrecognized parameter name: %s" % parameter_name)
+            parameters[key] = stochastic
+        return parameters
