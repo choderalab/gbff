@@ -32,10 +32,13 @@ for (key, entry) in database.items():
     gaff_mol2_filename = os.path.join("./mol2files_gaff/", "%s.mol2" % key)
     prmtop_filename = os.path.join("./mol2files_gaff/", "%s.prmtop" % key)
     inpcrd_filename = os.path.join("./mol2files_gaff/", "%s.inpcrd" % key)
+    gro_filename = os.path.join("./topgro/", "%s.gro" % key)
+    top_filename = os.path.join("./topgro/", "%s.top" % key)
 
     #Add output directories if not already present
     make_path( 'tripos_mol2/' )
     make_path( 'mol2files_gaff/')
+    make_path( 'topgro/')
 
     molecule = openmoltools.openeye.smiles_to_oemol(entry['smiles'])
     charged = openmoltools.openeye.get_charges(molecule)
@@ -43,3 +46,4 @@ for (key, entry) in database.items():
 
     _, _ = openmoltools.utils.run_antechamber(key, tripos_filename, charge_method=None, gaff_mol2_filename=gaff_mol2_filename, frcmod_filename=frcmod_filename)
     openmoltools.utils.run_tleap(key, gaff_mol2_filename, frcmod_filename, prmtop_filename=prmtop_filename, inpcrd_filename=inpcrd_filename)
+    openmoltools.utils.convert_via_acpype( key, prmtop_filename, inpcrd_filename, out_top = top_filename, out_gro = gro_filename)
