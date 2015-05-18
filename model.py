@@ -10,10 +10,10 @@ import simtk.openmm.app.internal.customgbforces as customgbforces
 
 class GBFFModel(object):
     """
-    An abstract base class representing a Bayesian model fitting GB parameters to solvation free energy data
+    A base class representing a Bayesian model fitting GB parameters to solvation free energy data
     """
 
-    def __init__(self, database, initial_parameters, parameter_types, hydration_energy_function):
+    def __init__(self, database, initial_parameters, parameter_types, hydration_energy_factory):
         """
         Arguments
         ---------
@@ -23,12 +23,12 @@ class GBFFModel(object):
             Dict containing the starting set of parameters for the model
         parameter_types : list of strings
             A list of the different types of parameters (e.g., ['radius','scalingFactor'] for OBC2)
-        hydration_energy_function : function
-            The function to use in computing the energies of molecules
+        hydration_energy_factory : function
+            This will generate a function to compute the hydration free energy of molecules
         """
 
         solvated_system_database = self._create_solvated_systems(database, initial_parameters)
-        self.hydration_energy_function = hydration_energy_function
+        self.hydration_energy_factory = hydration_energy_factory
         self.parameter_types = parameter_types
         self.parameter_model = self._create_parameter_model(solvated_system_database, initial_parameters)
         self.model = self._create_bayesian_gbmodel(solvated_system_database, initial_parameters)
@@ -148,7 +148,8 @@ class GBFFModel(object):
             dg_exp = float(entry['expt']) # observed hydration free energy in kcal/mol
             ddg_exp = float(entry['d_expt']) # observed hydration free energy uncertainty in kcal/mol
             gbffmodel['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
-            gbffmodel[dg_gbsa_name] = pymc.Deterministic(eval=self.hydration_energy_function, doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
+            hydration_energy_function = self.hydration_energy_factory(entry)
+            gbffmodel[dg_gbsa_name] = pymc.Deterministic(eval=hydration_energy_function, doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
             gbffmodel[dg_exp_name] = pymc.Normal(dg_exp_name, mu=gbffmodel['dg_gbsa_%s' % cid], tau=gbffmodel['tau_%s' % cid], value=dg_exp, observed=True)
         return gbffmodel
 
