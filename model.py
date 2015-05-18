@@ -185,7 +185,7 @@ class GBFFThreeParameterModel(GBFFModel):
     A class that samples within the GBSA HCT, OBC1, OBC2 models
     """
 
-    def __init__(self, database, initial_parameters, hydration_energy_function, gbmodel=1):
+    def __init__(self, database, initial_parameters, hydration_energy_factory, gbmodel=1):
         """
         Arguments
         ---------
@@ -200,7 +200,7 @@ class GBFFThreeParameterModel(GBFFModel):
         """
         self.gbmodel = gbmodel
         parameter_types = ['radius', 'scalingFactor']
-        super(GBFFThreeParameterModel, self).__init__(database, initial_parameters, parameter_types, hydration_energy_function)
+        super(GBFFThreeParameterModel, self).__init__(database, initial_parameters, parameter_types, hydration_energy_factory)
 
 
     def _create_solvated_systems(self, database, initial_parameters):
@@ -281,6 +281,21 @@ class GBFFGBnModel(GBFFModel):
     A class to sample the parameters of the GBSAGBn model
     """
 
+    def __init__(self, database, initial_parameters, hydration_energy_function):
+        """
+        Arguments
+        ---------
+        database : dict
+            Database of FreeSolv solvation free energy data
+        initial_parameters : dict
+            Dict containing the starting set of parameters for the model
+        hydration_energy_function : function
+            The function to use in computing the energies of molecules
+
+        """
+        parameter_types = ['radius', 'scalingFactor']
+        super(GBFFGBnModel, self).__init__(database, initial_parameters, parameter_types, hydration_energy_function)
+
     def _create_solvated_systems(self, database, initial_parameters):
         """
         Create the solvated systems for the GB-HCT, OBC1, or OBC2 models
@@ -337,7 +352,7 @@ class GBFFGBnModel(GBFFModel):
             if parameter_name == 'scalingFactor':
                 stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
             elif parameter_name == 'radius':
-                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
+                stochastic = pymc.Uniform(key, value=value, lower=1, upper=2)
             else:
                 raise Exception("Unrecognized parameter name: %s" % parameter_name)
             parameters[key] = stochastic
@@ -409,7 +424,7 @@ class GBFFGBn2Model(GBFFModel):
             if parameter_name == 'scalingFactor':
                 stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
             elif parameter_name == 'radius':
-                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=3.5)
+                stochastic = pymc.Uniform(key, value=value, lower=1, upper=2)
             elif parameter_name == 'alpha':
                 stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
             elif parameter_name == 'beta':

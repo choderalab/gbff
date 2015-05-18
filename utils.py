@@ -352,7 +352,6 @@ def compute_hydration_energy(entry, parameters, platform_name="Reference"):
     from pymbar import MBAR
 
 
-
     molecule = entry['molecule']
     iupac_name = entry['iupac']
     cid = molecule.GetData('cid')
@@ -375,7 +374,9 @@ def compute_hydration_energy(entry, parameters, platform_name="Reference"):
         [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
         atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
         radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
+        print("The radius is %s" % str(radius))
         scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
+        print("The scaling factor is %s " % str(scalingFactor))
         gbsa_force.setParticleParameters(atom_index, [charge, radius, scalingFactor])
 
     # Create context for solvent system.
