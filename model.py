@@ -31,7 +31,7 @@ class GBFFModel(object):
         self.hydration_energy_function = hydration_energy_function
         self.parameter_types = parameter_types
         self.parameter_model = self._create_parameter_model(solvated_system_database, initial_parameters)
-        self.model = self._create_bayesian_gbmodel(solvated_system_database)
+        self.model = self._create_bayesian_gbmodel(solvated_system_database, initial_parameters)
 
 
 
@@ -82,13 +82,13 @@ class GBFFModel(object):
         gbffmodel['tau'] = pymc.Lambda('tau', lambda sigma=gbffmodel['sigma']: sigma**(-2))
 
         gbffmodel.update(self.parameter_model)
-        molecule_error_model = self._create_molecule_error_model(database)
-        gbffmodel.update(molecule_error_model)
+        gbffmodel_with_mols = self._add_mols_gbffmodel(database, gbffmodel)
 
 
-        RMSE_parents = {'dg_gbsa_%s'%cid : gbffmodel['dg_gbsa_%s' % cid] for cid in cid_list}
-        gbffmodel['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents=RMSE_parents, doc='RMSE', dtype=float, trace=True, verbose=1)
-        return gbffmodel
+
+        RMSE_parents = {'dg_gbsa_%s'%cid : gbffmodel_with_mols['dg_gbsa_%s' % cid] for cid in cid_list}
+        gbffmodel_with_mols['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents=RMSE_parents, doc='RMSE', dtype=float, trace=True, verbose=1)
+        return gbffmodel_with_mols
 
 
     def _create_solvated_systems(self, database, initial_parameters):
@@ -128,7 +128,7 @@ class GBFFModel(object):
         """
         raise NotImplementedError
 
-    def _create_molecule_error_model(self, database):
+    def _add_mols_gbffmodel(self, database, gbffmodel):
 
         """
         Create the error model for the hydration free energies
@@ -138,8 +138,7 @@ class GBFFModel(object):
             FreeSolv solvation free energy database in dict form
 
         """
-        molecule_error_model = dict()
-        parents = dict()
+       # gbffmodel = dict()
         cid_list = database.keys()
         for (molecule_index, cid) in enumerate(cid_list):
             entry = database[cid]
@@ -148,10 +147,10 @@ class GBFFModel(object):
             parents = self._get_parameters_of_molecule(entry['molecule'])
             dg_exp = float(entry['expt']) # observed hydration free energy in kcal/mol
             ddg_exp = float(entry['d_expt']) # observed hydration free energy uncertainty in kcal/mol
-            molecule_error_model['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=molecule_error_model['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
-            molecule_error_model[dg_exp_name] = pymc.Normal(dg_exp_name, mu=molecule_error_model['dg_gbsa_%s' % cid], tau=molecule_error_model['tau_%s' % cid], value=dg_exp, observed=True)
-            molecule_error_model[dg_gbsa_name] = pymc.Deterministic(eval=self.hydration_energy_function, doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
-        return molecule_error_model
+            gbffmodel['tau_%s' % cid] = pymc.Lambda('tau_%s' % cid, lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 + ddg_exp**2) ) # Include model error
+            gbffmodel[dg_gbsa_name] = pymc.Deterministic(eval=self.hydration_energy_function, doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
+            gbffmodel[dg_exp_name] = pymc.Normal(dg_exp_name, mu=gbffmodel['dg_gbsa_%s' % cid], tau=gbffmodel['tau_%s' % cid], value=dg_exp, observed=True)
+        return gbffmodel
 
     def _get_parameters_of_molecule(self, mol):
         """
