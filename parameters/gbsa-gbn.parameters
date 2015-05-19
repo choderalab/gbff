@@ -1,0 +1,17 @@
+% parameters for the GBn model (taken from igb=7 unitio.c in LEaP)
+
+% note that only C, H, N, O, S are defined in unitio.c. The rest are given a "default" of 1.5A
+% scalingfactors are taken from simtk.openmm.app.internal.amber_file_parser.py
+
+% atomtype radius    scalingfactor
+H           1.00     1.09085413633
+C           1.70     0.48435382330
+N           1.50     0.700147318409
+O           1.40     1.06557401132
+S           1.85     0.602256336067
+F           1.50     0.5
+Si          1.50     0.5
+P           1.50     0.5
+Cl          1.50     0.5
+Br          1.50     0.5
+I           1.50     0.5

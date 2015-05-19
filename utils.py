@@ -328,7 +328,10 @@ def compute_hydration_energies(database, parameters):
 
     return energies
 
-def compute_hydration_energy(entry, parameters, hydration_factory_parameters, platform_name="Reference"):
+
+
+
+def compute_hydration_energy(entry, parameters, platform_name="Reference"):
     """
     Compute hydration energy of a single molecule given a GBSA parameter set.
 
@@ -342,12 +345,12 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
     energy (float) - hydration energy in kcal/mol
 
     """
+    print type(parameters)
 
     platform = openmm.Platform.getPlatformByName(platform_name)
 
     from pymbar import MBAR
 
-    gbmodel = hydration_factory_parameters['gbmodel'].value
 
     molecule = entry['molecule']
     iupac_name = entry['iupac']
@@ -355,31 +358,13 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
 
     # Retrieve OpenMM System.
     vacuum_system = entry['system']
-    solvent_system = copy.deepcopy(entry['system'])
+    solvent_system = copy.deepcopy(entry['solvated_system'])
 
     # Get nonbonded force.
     forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
     nonbonded_force = forces['NonbondedForce']
+    gbsa_force = forces['CustomGBForce']
 
-    # Add GBSA force.
-    from simtk.openmm.app.internal import customgbforces
-    if gbmodel is None:
-        gbsa_force = openmm.GBSAOBCForce()
-        gbsa_force.setNonbondedMethod(openmm.GBSAOBCForce.NoCutoff) # set no cutoff
-        gbsa_force.setSoluteDielectric(1)
-        gbsa_force.setSolventDielectric(78)
-    elif gbmodel == 0:
-        gbsa_force = customgbforces.GBSAHCTForce(SA='ACE')
-    elif gbmodel == 1:
-        gbsa_force = customgbforces.GBSAOBC1Force(SA='ACE')
-    elif gbmodel == 2:
-        gbsa_force = customgbforces.GBSAOBC2Force(SA='ACE')
-    elif gbmodel == 3:
-        gbsa_force = customgbforces.GBSAGBnForce(SA='ACE')
-    elif gbmodel == 4:
-        gbsa_force = customgbforces.GBSAGBn2Force(SA='ACE')
-    else:
-        print("GBmodel %i out of range" % gbmodel)
     # Build indexable list of atoms.
     atoms = [atom for atom in molecule.GetAtoms()]
     natoms = len(atoms)
@@ -389,14 +374,10 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
         [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
         atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
         radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
+        print("The radius is %s" % str(radius))
         scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
-        if gbmodel is None:
-            gbsa_force.addParticle(charge, radius, scalingFactor)
-        else:
-            gbsa_force.addParticle([charge, radius, scalingFactor])
-
-    # Add the force to the system.
-    solvent_system.addForce(gbsa_force)
+        print("The scaling factor is %s " % str(scalingFactor))
+        gbsa_force.setParticleParameters(atom_index, [charge, radius, scalingFactor])
 
     # Create context for solvent system.
     timestep = 2.0 * units.femtosecond
@@ -454,14 +435,19 @@ def compute_hydration_energy(entry, parameters, hydration_factory_parameters, pl
 
     energy = kT * DeltaG_in_kT
 
-    print "%48s | %48s | DeltaG = %.3f +- %.3f kT | gbmodel = %d" % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT, gbmodel)
-    #print ""
+    print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
 
     return energy / units.kilocalories_per_mole
 
-def hydration_energy_factory(entry, hydration_factory_parameters):
+
+
+
+
+
+
+def hydration_energy_factory(entry):
     def hydration_energy(**parameters):
-        return compute_hydration_energy(entry, parameters, hydration_factory_parameters, platform_name="Reference")
+        return compute_hydration_energy(entry, parameters, platform_name="CPU")
     return hydration_energy
 
 #=============================================================================================
