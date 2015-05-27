@@ -71,7 +71,6 @@ class GBFFModel(object):
             error = np.zeros([nmolecules], np.float64)
             for (molecule_index, cid) in enumerate(cid_list):
                 entry = database[cid]
-                molecule = entry['molecule']
                 error[molecule_index] = args['dg_gbsa_%s' % cid] - float(entry['expt'])
             mse = np.mean((error - np.mean(error))**2)
             return np.sqrt(mse)
@@ -154,6 +153,7 @@ class GBFFModel(object):
             gbffmodel[dg_exp_name] = pymc.Normal(dg_exp_name, mu=gbffmodel['dg_gbsa_%s' % cid], tau=gbffmodel['tau_%s' % cid], value=dg_exp, observed=True)
         return gbffmodel
 
+
     def _add_parallel_gbffmodel(self, database, gbffmodel):
         """
         Create a version of the GBFF model using arrays inside the PyMC objects
@@ -167,6 +167,7 @@ class GBFFModel(object):
         hydration_energy_function = self.hydration_energy_factory(database)
         gbffmodel['dg_gbsa'] = pymc.Deterministic(eval=hydration_energy_function, doc='ComputedDeltaG', name='dg_gbsa', parents=self.parameter_model, dtype=float, trace=True, verbose=1)
         gbffmodel['dg_exp'] = pymc.Normal('dg_exp', mu=gbffmodel['dg_gbsa'], tau=gbffmodel['taus'], value = dg_exp, observed=True)
+        return gbffmodel
 
 
 
