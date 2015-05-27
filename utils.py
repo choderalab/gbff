@@ -338,6 +338,11 @@ def hydration_energy_factory(entry):
         return compute_hydration_energy(entry, parameters, platform_name="CPU")
     return hydration_energy
 
+def array_hydration_energies_factory(database):
+    def hydration_energies(**parameters):
+        return compute_hydration_energies(database, parameters, platform_name='CPU')
+    return hydration_energies
+
 #=============================================================================================
 # Prepare the FreeSolv-format database for calculations.
 #=============================================================================================
