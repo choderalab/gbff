@@ -94,7 +94,7 @@ class GBFFModel(object):
 
     def _create_solvated_systems(self, database, initial_parameters):
         """
-        Generate a system with the appropriate GB force added to prevent recompilation. Specific
+        Generate a system with the appropriate GB force added. This does not prevent recompilation. Specific
         to the GB model, not implemented here.
 
         Arguments
@@ -163,7 +163,11 @@ class GBFFModel(object):
         cid_list = database.keys()
         dg_exp = [float(database[cid]['expt']) for cid in enumerate(cid_list)]
         ddg_exp = [float(database[cid]['d_expt']) for cid in enumerate(cid_list)]
-        taus = []
+        gbffmodel['taus'] = [self._make_tau(cid, database, gbffmodel) for cid in enumerate(cid_list)]
+        hydration_energy_function = self.hydration_energy_factory(database)
+        gbffmodel['dg_gbsa'] = pymc.Deterministic(eval=hydration_energy_function, doc='ComputedDeltaG', name='dg_gbsa', parents=self.parameter_model, dtype=float, trace=True, verbose=1)
+        gbffmodel['dg_exp'] = pymc.Normal('dg_exp', mu=gbffmodel['dg_gbsa'], tau=gbffmodel['taus'], value = dg_exp, observed=True)
+
 
 
 
@@ -174,7 +178,7 @@ class GBFFModel(object):
 
         Arguments
         ---------
-        cid : int
+        cid : string
             The compound ID
         database : dcit
             The FreeSolv database
@@ -188,6 +192,8 @@ class GBFFModel(object):
         """
         ddg_exp = float(database[cid]['d_expt'])
         lambda_sigma  = lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 + ddg_exp**2)
+        return pymc.Lambda('tau_%s' % cid, lambda_sigma)
+
 
 
 
