@@ -163,7 +163,31 @@ class GBFFModel(object):
         cid_list = database.keys()
         dg_exp = [float(database[cid]['expt']) for cid in enumerate(cid_list)]
         ddg_exp = [float(database[cid]['d_expt']) for cid in enumerate(cid_list)]
+        taus = []
 
+
+
+    def _make_tau(self, cid, database, gbffmodel):
+        """
+        An auxiliary function to make the molecule taus in a cleaner, more separated fashion
+        than having the list comprehension do everything
+
+        Arguments
+        ---------
+        cid : int
+            The compound ID
+        database : dcit
+            The FreeSolv database
+        gbffmodel : dict
+            A dictionary of the nodes for the pymc model
+
+        Returns
+        -------
+        tau : pymc.Lambda
+            The tau pymc lambda
+        """
+        ddg_exp = float(database[cid]['d_expt'])
+        lambda_sigma  = lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 + ddg_exp**2)
 
 
 
