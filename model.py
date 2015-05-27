@@ -71,7 +71,7 @@ class GBFFModel(object):
             error = np.zeros([nmolecules], np.float64)
             for (molecule_index, cid) in enumerate(cid_list):
                 entry = database[cid]
-                error[molecule_index] = args['dg_gbsa_%s' % cid] - float(entry['expt'])
+                error[molecule_index] = args[molecule_index] - float(entry['expt'])
             mse = np.mean((error - np.mean(error))**2)
             return np.sqrt(mse)
 
@@ -86,7 +86,7 @@ class GBFFModel(object):
 
 
 
-        RMSE_parents = {'dg_gbsa_%s'%cid : gbffmodel_with_mols['dg_gbsa_%s' % cid] for cid in cid_list}
+        RMSE_parents = gbffmodel_with_mols['dg_gbsa']
         gbffmodel_with_mols['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents=RMSE_parents, doc='RMSE', dtype=float, trace=True, verbose=1)
         return gbffmodel_with_mols
 
