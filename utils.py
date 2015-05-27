@@ -331,7 +331,7 @@ def compute_hydration_energies(database, parameters):
 
 
 
-def compute_hydration_energy(entry, parameters, platform_name="Reference"):
+def compute_hydration_energy(entry, parameters, platform_name="CPU"):
     """
     Compute hydration energy of a single molecule given a GBSA parameter set.
 
@@ -345,7 +345,7 @@ def compute_hydration_energy(entry, parameters, platform_name="Reference"):
     energy (float) - hydration energy in kcal/mol
 
     """
-    print type(parameters)
+
 
     platform = openmm.Platform.getPlatformByName(platform_name)
 
@@ -369,24 +369,26 @@ def compute_hydration_energy(entry, parameters, platform_name="Reference"):
     atoms = [atom for atom in molecule.GetAtoms()]
     natoms = len(atoms)
 
+
+    # Create context for solvent system.
+    timestep = 2.0 * units.femtosecond
+    solvent_integrator = entry['solvent_integrator']
+    solvent_context = entry['solvent_context']
+
+
+    # Create context for vacuum system.
+    vacuum_integrator = entry['vacuum_integrator']
+    vacuum_context = entry['vacuum_context']
+
     # Assign GBSA parameters.
     for (atom_index, atom) in enumerate(atoms):
         [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
         atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
         radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
-        print("The radius is %s" % str(radius))
         scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
-        print("The scaling factor is %s " % str(scalingFactor))
         gbsa_force.setParticleParameters(atom_index, [charge, radius, scalingFactor])
+        gbsa_force.updateParametersInContext(solvent_context)
 
-    # Create context for solvent system.
-    timestep = 2.0 * units.femtosecond
-    solvent_integrator = openmm.VerletIntegrator(timestep)
-    solvent_context = openmm.Context(solvent_system, solvent_integrator, platform)
-
-    # Create context for vacuum system.
-    vacuum_integrator = openmm.VerletIntegrator(timestep)
-    vacuum_context = openmm.Context(vacuum_system, vacuum_integrator, platform)
 
     # Compute energy differences.
     temperature = entry['temperature']
@@ -435,7 +437,7 @@ def compute_hydration_energy(entry, parameters, platform_name="Reference"):
 
     energy = kT * DeltaG_in_kT
 
-    print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
+    #print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
 
     return energy / units.kilocalories_per_mole
 

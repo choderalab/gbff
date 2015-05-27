@@ -5,6 +5,7 @@ import numpy as np
 import math
 import copy
 import simtk.unit as units
+import simtk.openmm as openmm
 import simtk.openmm.app.internal.customgbforces as customgbforces
 
 
@@ -153,6 +154,19 @@ class GBFFModel(object):
             gbffmodel[dg_exp_name] = pymc.Normal(dg_exp_name, mu=gbffmodel['dg_gbsa_%s' % cid], tau=gbffmodel['tau_%s' % cid], value=dg_exp, observed=True)
         return gbffmodel
 
+    def _add_parallel_gbffmodel(self, database, gbffmodel):
+        """
+        Create a version of the GBFF model using arrays inside the PyMC objects
+
+        """
+
+        cid_list = database.keys()
+        dg_exp = [float(database[cid]['expt']) for cid in enumerate(cid_list)]
+        ddg_exp = [float(database[cid]['d_expt']) for cid in enumerate(cid_list)]
+
+
+
+
     def _get_parameters_of_molecule(self, mol):
         """
         This is a convenience function to identify the parameters necessary for a given molecule.
@@ -239,7 +253,23 @@ class GBFFThreeParameterModel(GBFFModel):
                 scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
                 gbsa_force.addParticle([charge, radius, scalingFactor])
             solvent_system.addForce(gbsa_force)
+
+            platform = openmm.Platform.getPlatformByName('CPU')
+
             entry['solvated_system'] = solvent_system
+            timestep = 2.0 * units.femtosecond
+            solvent_integrator = openmm.VerletIntegrator(timestep)
+            solvent_context = openmm.Context(solvent_system, solvent_integrator, platform)
+            print('adding the integrator and context to the dict!')
+            entry['solvent_integrator'] = solvent_integrator
+            entry['solvent_context'] = solvent_context
+
+            vacuum_system = entry['system']
+            vacuum_integrator = openmm.VerletIntegrator(timestep)
+            vacuum_context = openmm.Context(vacuum_system, vacuum_integrator, platform)
+            entry['vacuum_integrator'] = vacuum_integrator
+            entry['vacuum_context'] = vacuum_context
+
             database[cid] = entry
 
         return database
@@ -325,7 +355,22 @@ class GBFFGBnModel(GBFFModel):
                 scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
                 gbsa_force.addParticle([charge, radius, scalingFactor])
             solvent_system.addForce(gbsa_force)
+
+
+            platform = openmm.Platform.getPlatformByName('CPU')
+            timestep = 2.0 * units.femtosecond
+            solvent_integrator = openmm.VerletIntegrator(timestep)
+            solvent_context = openmm.Context(solvent_system, solvent_integrator, platform)
             entry['solvated_system'] = solvent_system
+            print('adding the integrator and context to the dict!')
+            entry['solvent_integrator'] = solvent_integrator
+            entry['solvent_context'] = solvent_context
+
+            vacuum_system = entry['system']
+            vacuum_integrator = openmm.VerletIntegrator(timestep)
+            vacuum_context = openmm.Context(vacuum_system, vacuum_integrator, platform)
+            entry['vacuum_integrator'] = vacuum_integrator
+            entry['vacuum_context'] = vacuum_context
             database[cid] = entry
         return database
 
