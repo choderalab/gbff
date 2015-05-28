@@ -212,6 +212,7 @@ def compute_hydration_energies(database, parameters, platform_name='CPU'):
 
     for (molecule_index, cid) in enumerate(database.keys()):
         entry = database[cid]
+        print(entry.keys())
         delta_gs[molecule_index] = compute_hydration_energy(entry, parameters, platform_name)
     return delta_gs / units.kilocalories_per_mole
 
@@ -237,6 +238,7 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
 
     from pymbar import MBAR
 
+    timestep = 2 * units.femtoseconds
 
     molecule = entry['molecule']
     iupac_name = entry['iupac']
@@ -258,11 +260,11 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
 
     # Create context for solvent system.
     timestep = 2.0 * units.femtosecond
-    solvent_integrator = entry['solvent_integrator']
+    solvent_integrator = openmm.VerletIntegrator(timestep)
 
 
     # Create context for vacuum system.
-    vacuum_integrator = entry['vacuum_integrator']
+    vacuum_integrator = openmm.VerletIntegrator(timestep)
 
     # Assign GBSA parameters.
     for (atom_index, atom) in enumerate(atoms):

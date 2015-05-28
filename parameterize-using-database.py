@@ -117,29 +117,29 @@ if __name__=="__main__":
     utils.prepare_database(database, options.atomtypes_filename, parameters, mol2_directory=options.mol2_directory, verbose=options.verbose)
 
     # Compute energies with all molecules.
-    print "Computing all energies..."
-    start_time = time.time()
-    energies = utils.compute_hydration_energies(database, parameters)
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print "%.3f s elapsed" % elapsed_time
-
-    # Print comparison.
-    signed_errors = np.zeros([len(database.keys())], np.float64)
-    for (i, (cid, entry)) in enumerate(database.items()):
-        # Get metadata.
-        molecule = entry['molecule']
-        name = molecule.GetTitle()
-        dg_exp           = float(entry['expt']) * units.kilocalories_per_mole
-        ddg_exp          = float(entry['d_expt']) * units.kilocalories_per_mole
-        signed_errors[i] = energies[molecule] / units.kilocalories_per_mole - dg_exp / units.kilocalories_per_mole
-
-        # Form output.
-        outstring = "%64s %8.3f %8.3f %8.3f" % (name, dg_exp / units.kilocalories_per_mole, ddg_exp / units.kilocalories_per_mole, energies[molecule] / units.kilocalories_per_mole)
-
-        print outstring
-
-    print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
+    # print "Computing all energies..."
+    # start_time = time.time()
+    # energies = utils.compute_hydration_energies(database, parameters)
+    # end_time = time.time()
+    # elapsed_time = end_time - start_time
+    # print "%.3f s elapsed" % elapsed_time
+    #
+    # # Print comparison.
+    # signed_errors = np.zeros([len(database.keys())], np.float64)
+    # for (i, (cid, entry)) in enumerate(database.items()):
+    #     # Get metadata.
+    #     molecule = entry['molecule']
+    #     name = molecule.GetTitle()
+    #     dg_exp           = float(entry['expt']) * units.kilocalories_per_mole
+    #     ddg_exp          = float(entry['d_expt']) * units.kilocalories_per_mole
+    #     signed_errors[i] = energies[molecule] / units.kilocalories_per_mole - dg_exp / units.kilocalories_per_mole
+    #
+    #     # Form output.
+    #     outstring = "%64s %8.3f %8.3f %8.3f" % (name, dg_exp / units.kilocalories_per_mole, ddg_exp / units.kilocalories_per_mole, energies[molecule] / units.kilocalories_per_mole)
+    #
+    #     print outstring
+    #
+    # print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
 
     # Create MCMC model.
     obcmodel = model.GBFFThreeParameterModel(database, parameters, utils.array_hydration_energies_factory, gbmodel=2)

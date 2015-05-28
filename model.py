@@ -259,7 +259,7 @@ class GBFFThreeParameterModel(GBFFModel):
         initial_parameters : dict
             A dictionary of the initial parameters for the HCT force
         """
-
+        print("Creating solvated systems")
         cid_list = database.keys()
 
         for (molecule_index, cid) in enumerate(cid_list):
@@ -285,20 +285,7 @@ class GBFFThreeParameterModel(GBFFModel):
                 gbsa_force.addParticle([charge, radius, scalingFactor])
             solvent_system.addForce(gbsa_force)
 
-            platform = openmm.Platform.getPlatformByName('CPU')
-
             entry['solvated_system'] = solvent_system
-            timestep = 2.0 * units.femtosecond
-            solvent_integrator = openmm.VerletIntegrator(timestep)
-            print('adding the integrator and context to the dict!')
-            entry['solvent_integrator'] = solvent_integrator
-
-
-            vacuum_system = entry['system']
-            vacuum_integrator = openmm.VerletIntegrator(timestep)
-
-            entry['vacuum_integrator'] = vacuum_integrator
-
 
             database[cid] = entry
 
@@ -320,7 +307,7 @@ class GBFFThreeParameterModel(GBFFModel):
         parameters : dict
             PyMC dictionary containing the parameters to sample.\
         """
-
+        print("Creating parameter model")
         parameters = dict() # just the parameters
         for (key, value) in initial_parameters.iteritems():
             (atomtype, parameter_name) = key.split('_')
