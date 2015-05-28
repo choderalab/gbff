@@ -210,7 +210,7 @@ def compute_hydration_energies(database, parameters, platform_name='CPU'):
 
     delta_gs = np.zeros(len(database.keys()))
 
-    for (molecule_index, cid) in database.keys():
+    for (molecule_index, cid) in enumerate(database.keys()):
         entry = database[cid]
         delta_gs[molecule_index] = compute_hydration_energy(entry, parameters, platform_name)
     return delta_gs / units.kilocalories_per_mole
@@ -259,12 +259,10 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
     # Create context for solvent system.
     timestep = 2.0 * units.femtosecond
     solvent_integrator = entry['solvent_integrator']
-    solvent_context = entry['solvent_context']
 
 
     # Create context for vacuum system.
     vacuum_integrator = entry['vacuum_integrator']
-    vacuum_context = entry['vacuum_context']
 
     # Assign GBSA parameters.
     for (atom_index, atom) in enumerate(atoms):
@@ -273,8 +271,9 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
         radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
         scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
         gbsa_force.setParticleParameters(atom_index, [charge, radius, scalingFactor])
-        gbsa_force.updateParametersInContext(solvent_context)
 
+    solvent_context = openmm.Context(solvent_system, solvent_integrator)
+    vacuum_context = openmm.Context(vacuum_system, vacuum_integrator)
 
     # Compute energy differences.
     temperature = entry['temperature']

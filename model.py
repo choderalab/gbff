@@ -290,16 +290,15 @@ class GBFFThreeParameterModel(GBFFModel):
             entry['solvated_system'] = solvent_system
             timestep = 2.0 * units.femtosecond
             solvent_integrator = openmm.VerletIntegrator(timestep)
-            solvent_context = openmm.Context(solvent_system, solvent_integrator, platform)
             print('adding the integrator and context to the dict!')
             entry['solvent_integrator'] = solvent_integrator
-            entry['solvent_context'] = solvent_context
+
 
             vacuum_system = entry['system']
             vacuum_integrator = openmm.VerletIntegrator(timestep)
-            vacuum_context = openmm.Context(vacuum_system, vacuum_integrator, platform)
+
             entry['vacuum_integrator'] = vacuum_integrator
-            entry['vacuum_context'] = vacuum_context
+
 
             database[cid] = entry
 

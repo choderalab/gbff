@@ -142,7 +142,7 @@ if __name__=="__main__":
     print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
 
     # Create MCMC model.
-    obcmodel = model.GBFFThreeParameterModel(database, parameters, utils.hydration_energy_factory, gbmodel=2)
+    obcmodel = model.GBFFThreeParameterModel(database, parameters, utils.array_hydration_energies_factory, gbmodel=2)
 
     # Sample models.
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
