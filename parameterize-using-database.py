@@ -142,6 +142,8 @@ if __name__=="__main__":
     # print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
 
     # Create MCMC model.
+
+    print("The address of the database in the main driver script is %s " % hex(id(database)))
     obcmodel = model.GBFFThreeParameterModel(database, parameters, utils.array_hydration_energies_factory, gbmodel=2)
 
     # Sample models.

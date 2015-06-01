@@ -209,10 +209,14 @@ def compute_hydration_energies(database, parameters, platform_name='CPU'):
     """
 
     delta_gs = np.zeros(len(database.keys()))
-
+    #print(str(database))
+    cid_list = database.keys()
+    print("the id of the database in the eval is %s" % hex(id(database)))
+    #print("The cid list is %s" % str(cid_list))
     for (molecule_index, cid) in enumerate(database.keys()):
         entry = database[cid]
-        print(entry.keys())
+     #   print("The cid is %s" % cid)
+      #  print("The molecule index is %s" % molecule_index)
         delta_gs[molecule_index] = compute_hydration_energy(entry, parameters, platform_name)
     return delta_gs / units.kilocalories_per_mole
 
@@ -341,6 +345,7 @@ def hydration_energy_factory(entry):
 
 def array_hydration_energies_factory(database):
     def hydration_energies(**parameters):
+        print("The address of the database is %s" % hex(id(database)))
         return compute_hydration_energies(database, parameters, platform_name='CPU')
     return hydration_energies
 
