@@ -69,7 +69,6 @@ class GBFFModel(object):
         def RMSE(**args):
             nmolecules = len(cid_list)
             error = np.zeros([nmolecules], np.float64)
-            print(args)
             for (molecule_index, cid) in enumerate(cid_list):
                 entry = database[cid]
                 error[molecule_index] = args['dg_gbsa'][molecule_index]- float(entry['expt'])
@@ -180,10 +179,6 @@ class GBFFModel(object):
 
         hydration_energy_function = self.hydration_energy_factory(database)
         gbffmodel['dg_gbsa'] = pymc.Deterministic(eval=hydration_energy_function, doc='ComputedDeltaG', name='dg_gbsa', parents=self.parameter_model, dtype=float, trace=True, verbose=1)
-        print("Printing value of dg_gbsa \n")
-        print(gbffmodel['dg_gbsa'].value)
-        print("printing value of tau \n")
-        print(gbffmodel['tau'].value)
         gbffmodel['dg_exp'] = pymc.Normal('dg_exp', mu=gbffmodel['dg_gbsa'], tau=gbffmodel['tau'], value=dg_exp, observed=True)
         return gbffmodel
 
@@ -280,9 +275,7 @@ class GBFFThreeParameterModel(GBFFModel):
         initial_parameters : dict
             A dictionary of the initial parameters for the HCT force
         """
-        print("Creating solvated systems")
         cid_list = database.keys()
-        print("The id of the database in the model is %s" % hex(id(database)))
         for (molecule_index, cid) in enumerate(cid_list):
             entry = database[cid]
             molecule = entry['molecule']
@@ -328,7 +321,7 @@ class GBFFThreeParameterModel(GBFFModel):
         parameters : dict
             PyMC dictionary containing the parameters to sample.\
         """
-        print("Creating parameter model")
+
         parameters = dict() # just the parameters
         for (key, value) in initial_parameters.iteritems():
             (atomtype, parameter_name) = key.split('_')
@@ -400,7 +393,6 @@ class GBFFGBnModel(GBFFModel):
             solvent_integrator = openmm.VerletIntegrator(timestep)
             solvent_context = openmm.Context(solvent_system, solvent_integrator, platform)
             entry['solvated_system'] = solvent_system
-            print('adding the integrator and context to the dict!')
             entry['solvent_integrator'] = solvent_integrator
             entry['solvent_context'] = solvent_context
 

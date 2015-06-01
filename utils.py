@@ -209,15 +209,11 @@ def compute_hydration_energies(database, parameters, platform_name='CPU'):
     """
 
     delta_gs = np.zeros(len(database.keys()))
-    #print(str(database))
+
     cid_list = database.keys()
-    print("the id of the database in the eval is %s" % hex(id(database)))
-    #print("The cid list is %s" % str(cid_list))
     for (molecule_index, cid) in enumerate(database.keys()):
         entry = database[cid]
-        print("The molecule index is " + str(molecule_index))
         energy = compute_hydration_energy(entry, parameters, platform_name)
-        print("The energy is " + str(energy))
         delta_gs[molecule_index] = energy
     return delta_gs
 
@@ -329,7 +325,7 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
 
     energy = kT * DeltaG_in_kT
 
-    #print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
+    print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
 
     return energy / energy.unit
 
@@ -346,7 +342,6 @@ def hydration_energy_factory(entry):
 
 def array_hydration_energies_factory(database):
     def hydration_energies(**parameters):
-        print("The address of the database is %s" % hex(id(database)))
         return compute_hydration_energies(database, parameters, platform_name='CPU')
     return hydration_energies
 
@@ -444,8 +439,7 @@ def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
     database : dict
         The FreeSolv database dict containing OpenMM systems for each molecule
     """
-    print("Creating")
-    
+
     if path_to_prmtops is None:
         FREESOLV_PATH = os.environ["FREESOLV_PATH"]
         path_to_prmtops = os.path.join(FREESOLV_PATH + "/mol2files_gaff/")
