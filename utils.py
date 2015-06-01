@@ -215,10 +215,11 @@ def compute_hydration_energies(database, parameters, platform_name='CPU'):
     #print("The cid list is %s" % str(cid_list))
     for (molecule_index, cid) in enumerate(database.keys()):
         entry = database[cid]
-     #   print("The cid is %s" % cid)
-      #  print("The molecule index is %s" % molecule_index)
-        delta_gs[molecule_index] = compute_hydration_energy(entry, parameters, platform_name)
-    return delta_gs / units.kilocalories_per_mole
+        print("The molecule index is " + str(molecule_index))
+        energy = compute_hydration_energy(entry, parameters, platform_name)
+        print("The energy is " + str(energy))
+        delta_gs[molecule_index] = energy
+    return delta_gs
 
 
 
@@ -330,7 +331,7 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
 
     #print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
 
-    return energy / units.kilocalories_per_mole
+    return energy / energy.unit
 
 
 
