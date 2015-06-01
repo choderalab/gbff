@@ -159,19 +159,35 @@ class GBFFModel(object):
         Create a version of the GBFF model using arrays inside the PyMC objects
 
         """
-
         cid_list = database.keys()
         dg_exp = [float(database[cid]['expt']) for cid in cid_list]
         ddg_exp = [float(database[cid]['d_expt']) for cid in cid_list]
-        gbffmodel['taus'] = [self._make_tau(cid, database, gbffmodel) for cid in cid_list]
+
+
+        def _array_tau(sigma):
+            sigma_list = np.zeros(len(ddg_exp))
+            for i, ddg in enumerate(ddg_exp):
+                sigma_list[i] = 1.0 / (sigma**2 + ddg**2)
+            return sigma_list
+
+
+        #lambda_sigma = [lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 +ddg_exp[cid]['d_expt']**2) for cid in cid_list]
+        #gbffmodel['taus'] = [self._make_tau(cid, database, gbffmodel) for cid in cid_list]
+
+        gbffmodel['tau'] = pymc.Lambda('tau', lambda sigma=gbffmodel["sigma"]: _array_tau(sigma))
+
+
         hydration_energy_function = self.hydration_energy_factory(database)
         gbffmodel['dg_gbsa'] = pymc.Deterministic(eval=hydration_energy_function, doc='ComputedDeltaG', name='dg_gbsa', parents=self.parameter_model, dtype=float, trace=True, verbose=1)
         print("Printing value of dg_gbsa \n")
         print(gbffmodel['dg_gbsa'].value)
         print("printing value of tau \n")
-        print(gbffmodel['taus'].value)
-        gbffmodel['dg_exp'] = pymc.Normal('dg_exp', mu=gbffmodel['dg_gbsa'], tau=gbffmodel['taus'], value=dg_exp, observed=True)
+        print(gbffmodel['tau'].value)
+        gbffmodel['dg_exp'] = pymc.Normal('dg_exp', mu=gbffmodel['dg_gbsa'], tau=gbffmodel['tau'], value=dg_exp, observed=True)
         return gbffmodel
+
+
+
 
 
 
