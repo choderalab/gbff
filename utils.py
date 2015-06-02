@@ -22,6 +22,7 @@ import os
 import os.path
 import time
 import copy
+import celery
 
 import simtk.openmm as openmm
 import simtk.unit as units
@@ -328,10 +329,6 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
     print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, DeltaG_in_kT, dDeltaG_in_kT)
 
     return energy / energy.unit
-
-
-
-
 
 
 

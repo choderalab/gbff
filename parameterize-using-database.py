@@ -30,9 +30,7 @@ import model
 
 from optparse import OptionParser # For parsing of command line arguments
 
-import numpy as np
-
-import simtk.unit as units
+import hydration_energies.energytasks as energytasks
 
 import pymc
 
@@ -144,7 +142,7 @@ if __name__=="__main__":
     # Create MCMC model.
 
     print("The address of the database in the main driver script is %s " % hex(id(database)))
-    obcmodel = model.GBFFThreeParameterModel(database, parameters, utils.array_hydration_energies_factory, gbmodel=2)
+    obcmodel = model.GBFFThreeParameterModel(database, parameters, energytasks.celery_hydration_energies_factory, gbmodel=2)
 
     # Sample models.
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
