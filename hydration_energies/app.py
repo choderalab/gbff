@@ -2,8 +2,9 @@ __author__ = 'Patrick B. Grinaway'
 
 from celery import Celery
 import yaml
+import os
 
-config_file = open('/Users/grinawap/gbff_cleanup/gbff/hydration_energies/config.yaml', 'r')
+config_file = open(os.environ['CELERY_CONFIG'], 'r')
 config = yaml.load(config_file)
 config_file.close()
 
