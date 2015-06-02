@@ -2,6 +2,7 @@ __author__ = 'Patrick B. Grinaway'
 
 import time
 import numpy as np
+import os
 import numpy.linalg as linalg
 import simtk.openmm as openmm
 import copy
@@ -13,7 +14,7 @@ from celery import group
 
 kB = units.BOLTZMANN_CONSTANT_kB * units.AVOGADRO_CONSTANT_NA # Boltzmann constant
 
-config_file = open('/Users/grinawap/gbff_cleanup/gbff/hydration_energies/config.yaml', 'r')
+config_file = open(os.environ['CELERY_CONFIG'], 'r')
 config = yaml.load(config_file)
 config_file.close()
 
