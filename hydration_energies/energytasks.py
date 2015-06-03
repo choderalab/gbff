@@ -39,7 +39,7 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
     """
 
 
-    platform = openmm.Platform.getPlatformByName(platform_name)
+    platform = openmm.Platform.getPlatformByName('CPU')
 
     from pymbar import MBAR
 
@@ -79,8 +79,8 @@ def compute_hydration_energy(entry, parameters, platform_name="CPU"):
         scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
         gbsa_force.setParticleParameters(atom_index, [charge, radius, scalingFactor])
 
-    solvent_context = openmm.Context(solvent_system, solvent_integrator)
-    vacuum_context = openmm.Context(vacuum_system, vacuum_integrator)
+    solvent_context = openmm.Context(solvent_system, solvent_integrator,platform)
+    vacuum_context = openmm.Context(vacuum_system, vacuum_integrator, platform)
 
     # Compute energy differences.
     temperature = entry['temperature']
