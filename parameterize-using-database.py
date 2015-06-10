@@ -30,9 +30,7 @@ import model
 
 from optparse import OptionParser # For parsing of command line arguments
 
-import numpy as np
-
-import simtk.unit as units
+import hydration_energies.energytasks as energytasks
 
 import pymc
 
@@ -117,35 +115,37 @@ if __name__=="__main__":
     utils.prepare_database(database, options.atomtypes_filename, parameters, mol2_directory=options.mol2_directory, verbose=options.verbose)
 
     # Compute energies with all molecules.
-    print "Computing all energies..."
-    start_time = time.time()
-    energies = utils.compute_hydration_energies(database, parameters)
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print "%.3f s elapsed" % elapsed_time
-
-    # Print comparison.
-    signed_errors = np.zeros([len(database.keys())], np.float64)
-    for (i, (cid, entry)) in enumerate(database.items()):
-        # Get metadata.
-        molecule = entry['molecule']
-        name = molecule.GetTitle()
-        dg_exp           = float(entry['expt']) * units.kilocalories_per_mole
-        ddg_exp          = float(entry['d_expt']) * units.kilocalories_per_mole
-        signed_errors[i] = energies[molecule] / units.kilocalories_per_mole - dg_exp / units.kilocalories_per_mole
-
-        # Form output.
-        outstring = "%64s %8.3f %8.3f %8.3f" % (name, dg_exp / units.kilocalories_per_mole, ddg_exp / units.kilocalories_per_mole, energies[molecule] / units.kilocalories_per_mole)
-
-        print outstring
-
-    print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
+    # print "Computing all energies..."
+    # start_time = time.time()
+    # energies = utils.compute_hydration_energies(database, parameters)
+    # end_time = time.time()
+    # elapsed_time = end_time - start_time
+    # print "%.3f s elapsed" % elapsed_time
+    #
+    # # Print comparison.
+    # signed_errors = np.zeros([len(database.keys())], np.float64)
+    # for (i, (cid, entry)) in enumerate(database.items()):
+    #     # Get metadata.
+    #     molecule = entry['molecule']
+    #     name = molecule.GetTitle()
+    #     dg_exp           = float(entry['expt']) * units.kilocalories_per_mole
+    #     ddg_exp          = float(entry['d_expt']) * units.kilocalories_per_mole
+    #     signed_errors[i] = energies[molecule] / units.kilocalories_per_mole - dg_exp / units.kilocalories_per_mole
+    #
+    #     # Form output.
+    #     outstring = "%64s %8.3f %8.3f %8.3f" % (name, dg_exp / units.kilocalories_per_mole, ddg_exp / units.kilocalories_per_mole, energies[molecule] / units.kilocalories_per_mole)
+    #
+    #     print outstring
+    #
+    # print "Initial RMS error %8.3f kcal/mol" % (signed_errors.std())
 
     # Create MCMC model.
-    gbnmodel = model.GBFFGBnModel(database, parameters, utils.hydration_energy_factory)
+
+    print("The address of the database in the main driver script is %s " % hex(id(database)))
+    obcmodel = model.GBFFThreeParameterModel(database, parameters, energytasks.celery_hydration_energies_factory, gbmodel=2)
 
     # Sample models.
-    sampler = pymc.MCMC(gbnmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
+    sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
     sampler.sample(iter=mcmcIterations, burn=0, verbose=True, progress_bar=True)
     sampler.db.close()

@@ -5,6 +5,7 @@ import numpy as np
 import math
 import copy
 import simtk.unit as units
+import simtk.openmm as openmm
 import simtk.openmm.app.internal.customgbforces as customgbforces
 
 
@@ -70,8 +71,7 @@ class GBFFModel(object):
             error = np.zeros([nmolecules], np.float64)
             for (molecule_index, cid) in enumerate(cid_list):
                 entry = database[cid]
-                molecule = entry['molecule']
-                error[molecule_index] = args['dg_gbsa_%s' % cid] - float(entry['expt'])
+                error[molecule_index] = args['dg_gbsa'][molecule_index]- float(entry['expt'])
             mse = np.mean((error - np.mean(error))**2)
             return np.sqrt(mse)
 
@@ -82,18 +82,18 @@ class GBFFModel(object):
         gbffmodel['tau'] = pymc.Lambda('tau', lambda sigma=gbffmodel['sigma']: sigma**(-2))
 
         gbffmodel.update(self.parameter_model)
-        gbffmodel_with_mols = self._add_mols_gbffmodel(database, gbffmodel)
+        gbffmodel_with_mols = self._add_parallel_gbffmodel(database, gbffmodel)
 
 
 
-        RMSE_parents = {'dg_gbsa_%s'%cid : gbffmodel_with_mols['dg_gbsa_%s' % cid] for cid in cid_list}
-        gbffmodel_with_mols['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents=RMSE_parents, doc='RMSE', dtype=float, trace=True, verbose=1)
+
+        gbffmodel_with_mols['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents={'dg_gbsa' : gbffmodel['dg_gbsa']}, doc='RMSE', dtype=float, trace=True, verbose=1)
         return gbffmodel_with_mols
 
 
     def _create_solvated_systems(self, database, initial_parameters):
         """
-        Generate a system with the appropriate GB force added to prevent recompilation. Specific
+        Generate a system with the appropriate GB force added. This does not prevent recompilation. Specific
         to the GB model, not implemented here.
 
         Arguments
@@ -152,6 +152,67 @@ class GBFFModel(object):
             gbffmodel[dg_gbsa_name] = pymc.Deterministic(eval=hydration_energy_function, doc=cid, name=dg_gbsa_name, parents=parents, dtype=float, trace=True, verbose=1)
             gbffmodel[dg_exp_name] = pymc.Normal(dg_exp_name, mu=gbffmodel['dg_gbsa_%s' % cid], tau=gbffmodel['tau_%s' % cid], value=dg_exp, observed=True)
         return gbffmodel
+
+
+    def _add_parallel_gbffmodel(self, database, gbffmodel):
+        """
+        Create a version of the GBFF model using arrays inside the PyMC objects
+
+        """
+        cid_list = database.keys()
+        dg_exp = [float(database[cid]['expt']) for cid in cid_list]
+        ddg_exp = [float(database[cid]['d_expt']) for cid in cid_list]
+
+
+        def _array_tau(sigma):
+            sigma_list = np.zeros(len(ddg_exp))
+            for i, ddg in enumerate(ddg_exp):
+                sigma_list[i] = 1.0 / (sigma**2 + ddg**2)
+            return sigma_list
+
+
+        #lambda_sigma = [lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 +ddg_exp[cid]['d_expt']**2) for cid in cid_list]
+        #gbffmodel['taus'] = [self._make_tau(cid, database, gbffmodel) for cid in cid_list]
+
+        gbffmodel['tau'] = pymc.Lambda('tau', lambda sigma=gbffmodel["sigma"]: _array_tau(sigma))
+
+
+        hydration_energy_function = self.hydration_energy_factory(database)
+        gbffmodel['dg_gbsa'] = pymc.Deterministic(eval=hydration_energy_function, doc='ComputedDeltaG', name='dg_gbsa', parents=self.parameter_model, dtype=float, trace=True, verbose=1)
+        gbffmodel['dg_exp'] = pymc.Normal('dg_exp', mu=gbffmodel['dg_gbsa'], tau=gbffmodel['tau'], value=dg_exp, observed=True)
+        return gbffmodel
+
+
+
+
+
+
+
+    def _make_tau(self, cid, database, gbffmodel):
+        """
+        An auxiliary function to make the molecule taus in a cleaner, more separated fashion
+        than having the list comprehension do everything
+
+        Arguments
+        ---------
+        cid : string
+            The compound ID
+        database : dcit
+            The FreeSolv database
+        gbffmodel : dict
+            A dictionary of the nodes for the pymc model
+
+        Returns
+        -------
+        tau : pymc.Lambda
+            The tau pymc lambda
+        """
+        ddg_exp = float(database[cid]['d_expt'])
+        lambda_sigma  = lambda sigma=gbffmodel['sigma'] : 1.0 / (sigma**2 + ddg_exp**2)
+        return pymc.Lambda('tau_%s' % cid, lambda_sigma)
+
+
+
 
     def _get_parameters_of_molecule(self, mol):
         """
@@ -214,9 +275,7 @@ class GBFFThreeParameterModel(GBFFModel):
         initial_parameters : dict
             A dictionary of the initial parameters for the HCT force
         """
-
         cid_list = database.keys()
-
         for (molecule_index, cid) in enumerate(cid_list):
             entry = database[cid]
             molecule = entry['molecule']
@@ -239,7 +298,9 @@ class GBFFThreeParameterModel(GBFFModel):
                 scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
                 gbsa_force.addParticle([charge, radius, scalingFactor])
             solvent_system.addForce(gbsa_force)
+
             entry['solvated_system'] = solvent_system
+
             database[cid] = entry
 
         return database
@@ -325,7 +386,21 @@ class GBFFGBnModel(GBFFModel):
                 scalingFactor = initial_parameters['%s_%s' % (atomtype, 'scalingFactor')]
                 gbsa_force.addParticle([charge, radius, scalingFactor])
             solvent_system.addForce(gbsa_force)
+
+
+            platform = openmm.Platform.getPlatformByName('CPU')
+            timestep = 2.0 * units.femtosecond
+            solvent_integrator = openmm.VerletIntegrator(timestep)
+            solvent_context = openmm.Context(solvent_system, solvent_integrator, platform)
             entry['solvated_system'] = solvent_system
+            entry['solvent_integrator'] = solvent_integrator
+            entry['solvent_context'] = solvent_context
+
+            vacuum_system = entry['system']
+            vacuum_integrator = openmm.VerletIntegrator(timestep)
+            vacuum_context = openmm.Context(vacuum_system, vacuum_integrator, platform)
+            entry['vacuum_integrator'] = vacuum_integrator
+            entry['vacuum_context'] = vacuum_context
             database[cid] = entry
         return database
 
