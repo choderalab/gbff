@@ -76,6 +76,14 @@ def read_gbsa_parameters(filename):
                 [atomtype, radius, scalingFactor] = elements
                 parameters['%s_%s' % (atomtype,'radius')] = float(radius)
                 parameters['%s_%s' % (atomtype,'scalingFactor')] = float(scalingFactor)
+            elif len(elements) == 5:
+                [atomtype, radius, scalingFactor, alpha, beta, gamma] = elements
+                parameters['%s_%s' % (atomtype,'radius')] = float(radius)
+                parameters['%s_%s' % (atomtype,'scalingFactor')] = float(scalingFactor)
+                parameters['%s_%s' % (atomtype,'alpha')] = float(alpha)
+                parameters['%s_%s' % (atomtype,'beta')] = float(beta)
+                parameters['%s_%s' % (atomtype,'gamma')] = float(gamma)
+
 
         return parameters
 
