@@ -288,11 +288,11 @@ class GBFFAllModels(GBFFModel):
             elif parameter_name == 'radius':
                 stochastic = pymc.Uniform(key, value=value, lower=1, upper=2.5)
             elif parameter_name == 'alpha':
-                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+                stochastic = pymc.Normal(key, value=value, mu=value, tau=uninformative_tau)
             elif parameter_name == 'beta':
-                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+                stochastic = pymc.Normal(key, value=value, mu=value, tau=uninformative_tau)
             elif parameter_name == 'gamma':
-                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+                stochastic = pymc.Normal(key, value=value, mu=value, tau=uninformative_tau)
             else:
                 raise Exception("Unrecognized parameter name: %s" % parameter_name)
             parameters[key] = stochastic
