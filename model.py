@@ -57,7 +57,6 @@ class GBFFModel(object):
             A dict containing the nodes of a PyMC model to sample
 
         """
-
         gbffmodel = dict()
         log_sigma_min = math.log(0.01) # kcal/mol
         log_sigma_max = math.log(10.0) # kcal/mol
@@ -77,17 +76,19 @@ class GBFFModel(object):
 
 
 
+
+
         gbffmodel['log_sigma'] = pymc.Uniform('log_sigma', lower=log_sigma_min, upper=log_sigma_max, value=log_sigma_guess)
         gbffmodel['sigma'] = pymc.Lambda('sigma', lambda log_sigma=gbffmodel['log_sigma'] : math.exp(log_sigma))
         gbffmodel['tau'] = pymc.Lambda('tau', lambda sigma=gbffmodel['sigma']: sigma**(-2))
 
         gbffmodel.update(self.parameter_model)
+
+
         gbffmodel_with_mols = self._add_parallel_gbffmodel(database, gbffmodel)
+        gbffmodel_with_mols['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents={'dg_gbsa' : gbffmodel_with_mols['dg_gbsa']}, doc='RMSE', dtype=float, trace=True, verbose=1)
 
 
-
-
-        gbffmodel_with_mols['RMSE'] = pymc.Deterministic(eval=RMSE, name='RMSE', parents={'dg_gbsa' : gbffmodel['dg_gbsa']}, doc='RMSE', dtype=float, trace=True, verbose=1)
         return gbffmodel_with_mols
 
 
@@ -241,6 +242,63 @@ class GBFFModel(object):
         return self.model
 
 
+class GBFFAllModels(GBFFModel):
+    """
+    A class that creates a PyMC model for all GBSA models implemented in OpenMM. Does not create solvated system
+    """
+
+    def __init__(self, database, initial_parameters, hydration_energy_factory, ngbmodels=3):
+        parameter_types = ['radius', 'scalingFactor', 'alpha', 'beta','gamma']
+        self.ngbmodels = ngbmodels
+        self.stochastics_joint_proposal = []
+        super(GBFFAllModels, self).__init__(database, initial_parameters, parameter_types, hydration_energy_factory)
+
+
+    def _create_solvated_systems(self, database, initial_parameters):
+        """
+        This is a stub function that does nothing
+        """
+        return database
+
+    def _create_parameter_model(self, database, initial_parameters):
+        """
+        Creates set of stochastics representing the set of all parameters for all models
+
+        Arguments
+        ---------
+        database : dict
+            FreeSolv database
+        initial_parameters : dict
+            The set of initial values of the parameters
+
+        Returns
+        -------
+        parameters : dict
+            PyMC dictionary containing the parameters to sample.\
+        """
+        parameters = dict() # just the parameters
+        parameters['gbmodel_dir'] = pymc.Dirichlet('gbmodel_dir', np.ones([self.ngbmodels]))
+        parameters['gbmodel_prior'] = pymc.CompletedDirichlet('gbmodel_prior', parameters['gbmodel_dir'])
+        parameters['gbmodel'] = pymc.Categorical('gbmodel', p=parameters['gbmodel_prior'])
+        uninformative_tau = 0.0001
+        for (key, value) in initial_parameters.iteritems():
+            (atomtype, parameter_name) = key.split('_')
+            if parameter_name == 'scalingFactor':
+                stochastic = pymc.Uniform(key, value=value, lower=+0.01, upper=+1.0)
+            elif parameter_name == 'radius':
+                stochastic = pymc.Uniform(key, value=value, lower=1, upper=2.5)
+            elif parameter_name == 'alpha':
+                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+            elif parameter_name == 'beta':
+                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+            elif parameter_name == 'gamma':
+                stochastic = pymc.Normal(key, value=value, tau=uninformative_tau)
+            else:
+                raise Exception("Unrecognized parameter name: %s" % parameter_name)
+            parameters[key] = stochastic
+            self.stochastics_joint_proposal.append(stochastic)
+        return parameters
+
 class GBFFThreeParameterModel(GBFFModel):
     """
     A class that samples within the GBSA HCT, OBC1, OBC2 models
@@ -335,6 +393,31 @@ class GBFFThreeParameterModel(GBFFModel):
         return parameters
 
 
+class SmallSubsetOBCModel(GBFFThreeParameterModel):
+    """
+    A subclass of the GBFFThreeParameterModel that only samples parameters present in the dataset passed to it
+    """
+
+    def __init__(self, database, initial_parameters, hydration_energy_factory, gbmodel=1):
+        relevant_parms = self._identify_relevant_parameters(database)
+        relevant_parameter_dict = {key:value for key, value in initial_parameters.items() if key in relevant_parms}
+        super(SmallSubsetOBCModel, self).__init__(database, relevant_parameter_dict, hydration_energy_factory, gbmodel)
+
+    def _identify_relevant_parameters(self, database):
+        """
+        This is a function to identify which parameters are relevant to the systems at hand
+        """
+        relevant_parameters = []
+        cid_list = database.keys()
+        for (molecule_index, cid) in enumerate(cid_list):
+            entry = database[cid]
+            molecule = entry['molecule']
+            atoms = [atom for atom in molecule.GetAtoms()]
+            for atom in atoms:
+                atomtype = atom.GetStringData("gbsa_type")
+                relevant_parameters.append("%s_%s" % (atomtype, 'radius'))
+                relevant_parameters.append("%s_%s" % (atomtype, 'scalingFactor'))
+        return relevant_parameters
 
 
 class GBFFGBnModel(GBFFModel):
@@ -438,7 +521,7 @@ class GBFFGBnModel(GBFFModel):
 
 class GBFFGBn2Model(GBFFModel):
     """
-    A class that representes a Python object to sample over parameters for the GBn2 model
+    A class that represents a Python object to sample over parameters for the GBn2 model
     """
 
     def _create_solvated_systems(self, database, initial_parameters):

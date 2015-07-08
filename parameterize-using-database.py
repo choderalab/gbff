@@ -141,11 +141,11 @@ if __name__=="__main__":
 
     # Create MCMC model.
 
-    print("The address of the database in the main driver script is %s " % hex(id(database)))
-    obcmodel = model.GBFFThreeParameterModel(database, parameters, energytasks.celery_hydration_energies_factory, gbmodel=2)
+    obcmodel = model.GBFFAllModels(database, parameters, energytasks.sequential_computation_factory)
 
     # Sample models.
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
+    sampler.use_step_method(pymc.AdaptiveMetropolis, obcmodel.stochastics_joint_proposal, delay=100)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
-    sampler.sample(iter=mcmcIterations, burn=0, verbose=True, progress_bar=True)
+    sampler.sample(iter=mcmcIterations, burn=0, verbose=2, progress_bar=True)
     sampler.db.close()
