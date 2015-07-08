@@ -72,6 +72,7 @@ def read_gbsa_parameters(filename):
 
             # Parse parameters
             elements = line.split()
+            print("the length of the elements is %d" % len(elements))
             if len(elements) == 3:
                 [atomtype, radius, scalingFactor] = elements
                 parameters['%s_%s' % (atomtype,'radius')] = float(radius)
