@@ -206,10 +206,11 @@ def compute_hydration_energy_allmodel(entry, parameters, platform_name="CPU"):
         atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
         radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
         scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
-        if gbmodel == 5:
+        if gbmodel == 4:
             alpha = parameters['%s_alpha' % atomtype]
             beta = parameters['%s_beta' % atomtype]
             gamma = parameters['%s_gamma' % atomtype]
+            print("trying model 4")
             gbsa_force.addParticle([charge, radius, scalingFactor, alpha, beta, gamma])
         else:
             gbsa_force.addParticle([charge, radius, scalingFactor])
