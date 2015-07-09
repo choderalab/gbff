@@ -147,5 +147,5 @@ if __name__=="__main__":
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
     sampler.use_step_method(pymc.AdaptiveMetropolis, obcmodel.stochastics_joint_proposal, delay=100)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
-    sampler.sample(iter=mcmcIterations, burn=0, verbose=2, progress_bar=True)
+    sampler.sample(iter=mcmcIterations, burn=0, verbose=3, progress_bar=True)
     sampler.db.close()
