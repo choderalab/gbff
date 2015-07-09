@@ -210,7 +210,6 @@ def compute_hydration_energy_allmodel(entry, parameters, platform_name="CPU"):
             alpha = parameters['%s_alpha' % atomtype]
             beta = parameters['%s_beta' % atomtype]
             gamma = parameters['%s_gamma' % atomtype]
-            print("trying model 4")
             gbsa_force.addParticle([charge, radius, scalingFactor, alpha, beta, gamma])
         else:
             gbsa_force.addParticle([charge, radius, scalingFactor])
@@ -304,7 +303,7 @@ def compute_hydration_energies_celery(database, parameters, platform_name='CPU')
     """
     This function accepts an array of parameters and the database, and uses celery to distribute computation
     """
-    energy_group = group(compute_hydration_energy.s(database[cid], parameters, platform_name) for cid in database.keys())()
+    energy_group = group(compute_hydration_energy_allmodel.s(database[cid], parameters, platform_name) for cid in database.keys())()
     energies = [float(energy) for energy in energy_group.get()]
     print("Energy is %s" % str(energies))
     return energies

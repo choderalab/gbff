@@ -141,7 +141,7 @@ if __name__=="__main__":
 
     # Create MCMC model.
 
-    obcmodel = model.GBFFAllModels(database, parameters, energytasks.sequential_computation_factory, ngbmodels=5)
+    obcmodel = model.GBFFAllModels(database, parameters, energytasks.celery_hydration_energies_factory, ngbmodels=5)
 
     # Sample models.
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
