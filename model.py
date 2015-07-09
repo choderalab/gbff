@@ -251,6 +251,7 @@ class GBFFAllModels(GBFFModel):
         parameter_types = ['radius', 'scalingFactor', 'alpha', 'beta','gamma']
         self.ngbmodels = ngbmodels
         self.stochastics_joint_proposal = []
+        self.params_to_group = self._process_atom_types(initial_parameters)
         super(GBFFAllModels, self).__init__(database, initial_parameters, parameter_types, hydration_energy_factory)
 
 
@@ -259,6 +260,22 @@ class GBFFAllModels(GBFFModel):
         This is a stub function that does nothing
         """
         return database
+
+    def _process_atom_types(self, initial_parameters):
+        """
+        This is a utility function to group atom types. It will be replaced with something better.
+        """
+        params_to_group = []
+        atomtypes = set()
+        for key in initial_parameters.iterkeys():
+            (atomtype, parameter_name) = key.split('_')
+            atomtypes.add(atomtype)
+        for atomtype in atomtypes:
+            params_to_group.append(['%s_%s' % (atomtype, 'radius'), '%s_%s' % (atomtype, 'scalingFactor')])
+            if self.ngbmodels == 5:
+                params_to_group.append(['%s_%s' % (atomtype, 'alpha'), '%s_%s' % (atomtype, 'beta'),'%s_%s' % (atomtype, 'gamma')])
+        return params_to_group
+
 
     def _create_parameter_model(self, database, initial_parameters):
         """
@@ -281,12 +298,13 @@ class GBFFAllModels(GBFFModel):
         parameters['gbmodel_prior'] = pymc.CompletedDirichlet('gbmodel_prior', parameters['gbmodel_dir'])
         parameters['gbmodel'] = pymc.Categorical('gbmodel', p=parameters['gbmodel_prior'])
         uninformative_tau = 0.0001
+        joint_proposal_sets = {}
         for (key, value) in initial_parameters.iteritems():
             (atomtype, parameter_name) = key.split('_')
             if parameter_name == 'scalingFactor':
                 stochastic = pymc.Uniform(key, value=value, lower=-0.8, upper=+1.5)
             elif parameter_name == 'radius':
-                stochastic = pymc.Uniform(key, value=value, lower=1, upper=2.5)
+                stochastic = pymc.Uniform(key, value=value, lower=0.5, upper=2.5)
             elif parameter_name == 'alpha':
                 stochastic = pymc.Normal(key, value=value, mu=value, tau=uninformative_tau)
             elif parameter_name == 'beta':

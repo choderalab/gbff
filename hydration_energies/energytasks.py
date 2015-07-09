@@ -271,6 +271,7 @@ def compute_hydration_energy_allmodel(entry, parameters, platform_name="CPU"):
     return DeltaG_in_kT
 
 
+
 def compute_hydration_energies_sequentially(database, parameters, platform_name='CPU'):
     """
     Compute solvation energies of a set of molecules given a GBSA parameter set.
