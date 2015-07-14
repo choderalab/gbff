@@ -192,7 +192,7 @@ def prepare_database(database, atomtypes_filename,parameters,  mol2_directory, v
     """
     #TODO: fix this. Right now it inserts the path for the parent directory to access atomtyping.py
     cwd = os.getcwd()
-    sys.path.insert(os.path.dirname(cwd))
+    sys.path.insert(0,os.path.dirname(cwd))
     from atomtyping import type_atoms
     database_prepped = load_database(database, mol2_directory, verbose=verbose)
     database_with_systems = create_openmm_systems(database_prepped, verbose=verbose)
