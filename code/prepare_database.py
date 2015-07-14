@@ -15,7 +15,6 @@ import openeye.oechem
 from openeye import oechem
 import numpy as np
 import numpy.linalg as linalg
-from atomtyping import type_atoms
 
 #=============================================================================================
 # Constants
@@ -194,7 +193,7 @@ def prepare_database(database, atomtypes_filename,parameters,  mol2_directory, v
 
     database_prepped = load_database(database, mol2_directory, verbose=verbose)
     database_with_systems = create_openmm_systems(database_prepped, verbose=verbose)
-    database_atomtyped = type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
+    database_atomtyped = atomytyping.type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
     database_simulated = generate_simulation_data(database_atomtyped, parameters)
     return database_simulated
 
