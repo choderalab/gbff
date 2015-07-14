@@ -331,7 +331,7 @@ if __name__=="__main__":
     database_file.close()
     mol2_directory = os.path.join(os.environ['FREESOLV_PATH'], 'tripos_mol2')
     parameters = read_gbsa_parameters(options.parameters_filename)
-    database_prepared = prepare_database(database_raw, options.atomtypes_filename, parameters, mol2_directory)
+    database_prepared = prepare_database(database_raw, options.atomtypes_filename, parameters, mol2_directory, verbose=True)
     outfile = open(options.dbout,'w')
     pickle.dump(database_prepared, outfile)
     outfile.close()
