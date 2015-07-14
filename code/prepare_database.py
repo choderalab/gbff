@@ -190,10 +190,13 @@ def prepare_database(database, atomtypes_filename,parameters,  mol2_directory, v
     Wrapper function to prepare the database for sampling
 
     """
-
+    #TODO: fix this. Right now it inserts the path for the parent directory to access atomtyping.py
+    cwd = os.getcwd()
+    sys.path.insert(os.path.dirname(cwd))
+    from atomtyping import type_atoms
     database_prepped = load_database(database, mol2_directory, verbose=verbose)
     database_with_systems = create_openmm_systems(database_prepped, verbose=verbose)
-    database_atomtyped = atomytyping.type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
+    database_atomtyped = type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
     database_simulated = generate_simulation_data(database_atomtyped, parameters)
     return database_simulated
 
@@ -300,6 +303,7 @@ def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
 if __name__=="__main__":
     import os
     import pickle
+    import sys
     from optparse import OptionParser
     usage = """\
     usage: %prog --types typefile --parameters parameterfile --output outputpickle
@@ -319,6 +323,8 @@ if __name__=="__main__":
     if options.atomtypes_filename=='' or options.parameters_filename=='':
         parser.print_help()
         parser.error("All input files must be specified.")
+
+
     database_filepath = os.path.join(os.environ['FREESOLV_PATH'], 'database.pickle')
     database_raw = pickle.load(database_filepath,'r')
     mol2_directory = os.path.join(os.environ['FREESOLV_PATH'], 'tripos_mol2')
