@@ -151,8 +151,13 @@ if __name__=="__main__":
     # Sample models.
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
     params_to_group = obcmodel.params_to_group
-    for parmgroup in params_to_group:
-        sampler.use_step_method(pymc.AdaptiveMetropolis, [obcmodel.pymc_model[parm] for parm in parmgroup], delay=100)
+    paired_proposal=False
+    if paired_proposal:
+        for parmgroup in params_to_group:
+            sampler.use_step_method(pymc.AdaptiveMetropolis, [obcmodel.pymc_model[parm] for parm in parmgroup], delay=100)
+    else:
+        parmgroup = [item for sublist in params_to_group for item in sublist]
+        sampler.use_step_method(pymc.AdaptiveMetropolis, delay=100)
 
     #This causes all variables to be proposed simultaneously
     #sampler.use_step_method(pymc.AdaptiveMetropolis, obcmodel.stochastics_joint_proposal, delay=100)
