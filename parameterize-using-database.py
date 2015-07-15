@@ -25,7 +25,7 @@ import os
 import os.path
 import time
 import math
-
+import numpy as np
 import model
 
 from optparse import OptionParser # For parsing of command line arguments
@@ -81,6 +81,8 @@ if __name__=="__main__":
     parser.add_option("-s", "--subset", metavar='SUBSET',
                       action="store", type="int", dest='subset_size', default=None,
                       help="Size of subset to consider (for testing).")
+    parser.add_option("-p", "--prepare", metavar='PREPARE',
+                      action="store", dest='prepare', default=False, help="Prepare database (not already prepared)")
 
     parser.add_option("-v", "--verbose", metavar='VERBOSE',
                       action="store_true", dest='verbose', default=False,
@@ -105,15 +107,18 @@ if __name__=="__main__":
     import pickle
     database = pickle.load(open(options.database_filename, 'r'))
 
-    # DEBUG: Create a small subset.
+    # DEBUG: Create a small subset. Do this randomly
     if options.subset_size:
         subset_size = options.subset_size
         cid_list = database.keys()
-        database = dict((k, database[k]) for k in cid_list[0:subset_size])
+        max_num = len(cid_list)
+        mol_indices = np.random.choice(max_num, subset_size)
+        mols_to_use = [cid_list[k] for k in mol_indices]
+        database = dict((k, database[k]) for k in mols_to_use)
 
-    # Prepare the database for calculations.
-    utils.prepare_database(database, options.atomtypes_filename, parameters, mol2_directory=options.mol2_directory, verbose=options.verbose)
-
+    # Prepare the database for calculations, or just load it (already prepared)
+    if options.prepare:
+        utils.prepare_database(database, options.atomtypes_filename, parameters, mol2_directory=options.mol2_directory, verbose=options.verbose)
     # Compute energies with all molecules.
     # print "Computing all energies..."
     # start_time = time.time()
