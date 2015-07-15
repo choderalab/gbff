@@ -157,7 +157,7 @@ if __name__=="__main__":
             sampler.use_step_method(pymc.AdaptiveMetropolis, [obcmodel.pymc_model[parm] for parm in parmgroup], delay=100)
     else:
         parmgroup = [item for sublist in params_to_group for item in sublist]
-        sampler.use_step_method(pymc.AdaptiveMetropolis, delay=100)
+        sampler.use_step_method(pymc.AdaptiveMetropolis, parmgroup, delay=100)
 
     #This causes all variables to be proposed simultaneously
     #sampler.use_step_method(pymc.AdaptiveMetropolis, obcmodel.stochastics_joint_proposal, delay=100)
