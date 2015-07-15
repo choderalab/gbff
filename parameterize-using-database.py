@@ -81,7 +81,7 @@ if __name__=="__main__":
     parser.add_option("-s", "--subset", metavar='SUBSET',
                       action="store", type="int", dest='subset_size', default=None,
                       help="Size of subset to consider (for testing).")
-    parser.add_option("-p", "--prepare", metavar='PREPARE',
+    parser.add_option("-r", "--rprepare", metavar='PREPARE',
                       action="store", dest='prepare', default=False, help="Prepare database (not already prepared)")
 
     parser.add_option("-v", "--verbose", metavar='VERBOSE',
