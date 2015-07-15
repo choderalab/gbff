@@ -296,7 +296,10 @@ class GBFFAllModels(GBFFModel):
         parameters = dict() # just the parameters
         parameters['gbmodel_dir'] = pymc.Dirichlet('gbmodel_dir', np.ones([self.ngbmodels]))
         parameters['gbmodel_prior'] = pymc.CompletedDirichlet('gbmodel_prior', parameters['gbmodel_dir'])
-        parameters['gbmodel'] = pymc.Categorical('gbmodel', p=parameters['gbmodel_prior'])
+        if self.ngbmodels==5:
+            parameters['gbmodel'] = pymc.Categorical('gbmodel', value=4, p=parameters['gbmodel_prior'])
+        else:
+            parameters['gbmodel'] = pymc.Categorical('gbmodel', p=parameters['gbmodel_prior'])
         uninformative_tau = 0.0001
         joint_proposal_sets = {}
         for (key, value) in initial_parameters.iteritems():
