@@ -201,7 +201,7 @@ def prepare_database(database, atomtypes_filename,parameters,  mol2_directory, v
     database_with_systems = create_openmm_systems(database_prepped, verbose=verbose)
     database_atomtyped = type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
 
-    gen_simulation_data_parallel = partial(generate_simulation_data, [database_atomtyped, parameters])
+    gen_simulation_data_parallel = partial(generate_simulation_data, database_atomtyped, parameters)
     pool = Pool(32)
     sim_results = pool.map(gen_simulation_data_parallel, database_atomtyped.keys())
     database_simulated = {}
