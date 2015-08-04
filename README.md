@@ -4,7 +4,10 @@ Tools for Bayesian forcefield development
 #Prerequisites
 * Install redis with `conda install redis`
 * Install celery with `pip install celery`
-* Get FreeSolv database, set `FREESOLV_PATH` to location of database
+* Get FreeSolv database (`git clone https://github.com/choderalab/FreeSolv.git`)
+* Using commit ` 3acd4f6a5f005b803fac024a3a87f64b51409e28`
+* set `FREESOLV_PATH` to location of database
+ 
 
 #Preparing the database
 * Run `code/rebuild_freesolv`
