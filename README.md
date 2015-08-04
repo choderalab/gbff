@@ -23,3 +23,8 @@ Tools for Bayesian forcefield development
 * Start worker with the command `celery -A hydration_energies worker -l info -c 1 --app=hydration_energies.app:app`
 * the `c` option allows you to choose the number of processes/worker
 * Run `parameterize-using-database.py`
+
+#Output
+* Defaults to hdf5 backend
+* outputs in `/cbio/jclab/projects/pgrinaway/gbff/outputs.tar.gz` compressed
+* `300_adaptive_3gbmodel_largejoint_days.h5` is the most recent dataset
