@@ -25,7 +25,7 @@ import os
 import os.path
 import time
 import math
-
+import numpy as np
 import model
 
 from optparse import OptionParser # For parsing of command line arguments
@@ -81,6 +81,8 @@ if __name__=="__main__":
     parser.add_option("-s", "--subset", metavar='SUBSET',
                       action="store", type="int", dest='subset_size', default=None,
                       help="Size of subset to consider (for testing).")
+    parser.add_option("-r", "--rprepare", metavar='PREPARE',
+                      action="store", dest='prepare', default=False, help="Prepare database (not already prepared)")
 
     parser.add_option("-v", "--verbose", metavar='VERBOSE',
                       action="store_true", dest='verbose', default=False,
@@ -105,15 +107,18 @@ if __name__=="__main__":
     import pickle
     database = pickle.load(open(options.database_filename, 'r'))
 
-    # DEBUG: Create a small subset.
+    # DEBUG: Create a small subset. Do this randomly
     if options.subset_size:
         subset_size = options.subset_size
         cid_list = database.keys()
-        database = dict((k, database[k]) for k in cid_list[0:subset_size])
+        max_num = len(cid_list)
+        mol_indices = np.random.choice(max_num, subset_size)
+        mols_to_use = [cid_list[k] for k in mol_indices]
+        database = dict((k, database[k]) for k in mols_to_use)
 
-    # Prepare the database for calculations.
-    utils.prepare_database(database, options.atomtypes_filename, parameters, mol2_directory=options.mol2_directory, verbose=options.verbose)
-
+    # Prepare the database for calculations, or just load it (already prepared)
+    if options.prepare:
+        utils.prepare_database(database, options.atomtypes_filename, parameters, mol2_directory=options.mol2_directory, verbose=options.verbose)
     # Compute energies with all molecules.
     # print "Computing all energies..."
     # start_time = time.time()
@@ -141,11 +146,21 @@ if __name__=="__main__":
 
     # Create MCMC model.
 
-    print("The address of the database in the main driver script is %s " % hex(id(database)))
-    obcmodel = model.GBFFThreeParameterModel(database, parameters, energytasks.celery_hydration_energies_factory, gbmodel=2)
+    obcmodel = model.GBFFAllModels(database, parameters, energytasks.celery_hydration_energies_factory, ngbmodels=3)
 
     # Sample models.
     sampler = pymc.MCMC(obcmodel.pymc_model, db='hdf5', dbname=mcmcDbName)
+    params_to_group = obcmodel.params_to_group
+    paired_proposal=False
+    if paired_proposal:
+        for parmgroup in params_to_group:
+            sampler.use_step_method(pymc.AdaptiveMetropolis, [obcmodel.pymc_model[parm] for parm in parmgroup], delay=100)
+    else:
+        parmgroup = [item for sublist in params_to_group for item in sublist]
+        sampler.use_step_method(pymc.AdaptiveMetropolis, parmgroup, delay=100)
+
+    #This causes all variables to be proposed simultaneously
+    #sampler.use_step_method(pymc.AdaptiveMetropolis, obcmodel.stochastics_joint_proposal, delay=100)
     #sampler.isample(iter=mcmcIterations, burn=0, save_interval=1, verbose=options.verbose)
-    sampler.sample(iter=mcmcIterations, burn=0, verbose=True, progress_bar=True)
+    sampler.sample(iter=mcmcIterations, burn=0, verbose=3, progress_bar=True)
     sampler.db.close()

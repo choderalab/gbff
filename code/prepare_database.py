@@ -1,28 +1,12 @@
-#!/usr/bin/env python
-
-#=============================================================================================
-# MODULE DOCSTRING
-#=============================================================================================
-
-"""
-Utilities for Bayesian parameterization of GBSA models based on hydration free energies of small molecules.
-
-AUTHORS
-
-John D. Chodera <john.chodera@choderalab.org>
-
-The AtomTyper class is based on 'patty' by Pat Walters, Vertex Pharmaceuticals.
-
-"""
-#=============================================================================================
-# GLOBAL IMPORTS
-#=============================================================================================
+__author__ = 'Patrick B. Grinaway'
 
 import os
 import os.path
 import time
 import copy
 import celery
+from functools import partial
+from multiprocessing import Pool
 
 import simtk.openmm as openmm
 import simtk.unit as units
@@ -33,7 +17,6 @@ import openeye.oechem
 from openeye import oechem
 import numpy as np
 import numpy.linalg as linalg
-from atomtyping import type_atoms
 
 #=============================================================================================
 # Constants
@@ -92,7 +75,7 @@ def read_gbsa_parameters(filename):
 # Generate simulation data.
 #=============================================================================================
 
-def generate_simulation_data(database, parameters):
+def generate_simulation_data(database, parameters, cid):
     """
     Regenerate simulation data for given parameters.
 
@@ -107,97 +90,98 @@ def generate_simulation_data(database, parameters):
 
     from pymbar import timeseries
 
-    for cid in database.keys():
-        entry = database[cid]
-        molecule = entry['molecule']
-        iupac_name = entry['iupac']
 
-        # Retrieve vacuum system.
-        vacuum_system = copy.deepcopy(entry['system'])
+    entry = database[cid]
+    molecule = entry['molecule']
+    iupac_name = entry['iupac']
 
-        # Retrieve OpenMM System.
-        solvent_system = copy.deepcopy(entry['system'])
+    # Retrieve vacuum system.
+    vacuum_system = copy.deepcopy(entry['system'])
 
-        # Get nonbonded force.
-        forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
-        nonbonded_force = forces['NonbondedForce']
+    # Retrieve OpenMM System.
+    solvent_system = copy.deepcopy(entry['system'])
 
-        # Add GBSA term
-        gbsa_force = openmm.GBSAOBCForce()
-        gbsa_force.setNonbondedMethod(openmm.GBSAOBCForce.NoCutoff) # set no cutoff
-        gbsa_force.setSoluteDielectric(1)
-        gbsa_force.setSolventDielectric(78)
+    # Get nonbonded force.
+    forces = { solvent_system.getForce(index).__class__.__name__ : solvent_system.getForce(index) for index in range(solvent_system.getNumForces()) }
+    nonbonded_force = forces['NonbondedForce']
 
-        # Build indexable list of atoms.
-        atoms = [atom for atom in molecule.GetAtoms()]
-        natoms = len(atoms)
+    # Add GBSA term
+    gbsa_force = openmm.GBSAOBCForce()
+    gbsa_force.setNonbondedMethod(openmm.GBSAOBCForce.NoCutoff) # set no cutoff
+    gbsa_force.setSoluteDielectric(1)
+    gbsa_force.setSolventDielectric(78)
 
-        # Assign GBSA parameters.
-        for (atom_index, atom) in enumerate(atoms):
-            [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
-            atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
-            radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
-            scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
-            gbsa_force.addParticle(charge, radius, scalingFactor)
+    # Build indexable list of atoms.
+    atoms = [atom for atom in molecule.GetAtoms()]
+    natoms = len(atoms)
 
-        # Add the force to the system.
-        solvent_system.addForce(gbsa_force)
+    # Assign GBSA parameters.
+    for (atom_index, atom) in enumerate(atoms):
+        [charge, sigma, epsilon] = nonbonded_force.getParticleParameters(atom_index)
+        atomtype = atom.GetStringData("gbsa_type") # GBSA atomtype
+        radius = parameters['%s_%s' % (atomtype, 'radius')] * units.angstroms
+        scalingFactor = parameters['%s_%s' % (atomtype, 'scalingFactor')]
+        gbsa_force.addParticle(charge, radius, scalingFactor)
 
-        # Create context for solvent system.
-        timestep = 2.0 * units.femtosecond
-        collision_rate = 20.0 / units.picoseconds
-        temperature = entry['temperature']
-        integrator = openmm.LangevinIntegrator(temperature, collision_rate, timestep)
-        context = openmm.Context(vacuum_system, integrator, platform)
+    # Add the force to the system.
+    solvent_system.addForce(gbsa_force)
 
-        # Set the coordinates.
-        positions = entry['positions']
-        context.setPositions(positions)
+    # Create context for solvent system.
+    timestep = 2.0 * units.femtosecond
+    collision_rate = 20.0 / units.picoseconds
+    temperature = entry['temperature']
+    integrator = openmm.LangevinIntegrator(temperature, collision_rate, timestep)
+    context = openmm.Context(vacuum_system, integrator, platform)
 
-        # Minimize.
-        openmm.LocalEnergyMinimizer.minimize(context)
+    # Set the coordinates.
+    positions = entry['positions']
+    context.setPositions(positions)
 
-        # Simulate, saving periodic snapshots of configurations.
-        kT = kB * temperature
-        beta = 1.0 / kT
+    # Minimize.
+    openmm.LocalEnergyMinimizer.minimize(context)
 
-        initial_time = time.time()
-        nsteps_per_iteration = 2500
-        niterations = 200
-        x_n = np.zeros([niterations,natoms,3], np.float32) # positions, in nm
-        u_n = np.zeros([niterations], np.float64) # energy differences, in kT
-        for iteration in range(niterations):
-            integrator.step(nsteps_per_iteration)
-            state = context.getState(getEnergy=True, getPositions=True)
-            x_n[iteration,:,:] = state.getPositions(asNumpy=True) / units.nanometers
-            u_n[iteration] = beta * state.getPotentialEnergy()
+    # Simulate, saving periodic snapshots of configurations.
+    kT = kB * temperature
+    beta = 1.0 / kT
 
-        if np.any(np.isnan(u_n)):
-            raise Exception("Encountered NaN for molecule %s | %s" % (cid, iupac_name))
+    initial_time = time.time()
+    nsteps_per_iteration = 2500
+    niterations = 200
+    x_n = np.zeros([niterations,natoms,3], np.float32) # positions, in nm
+    u_n = np.zeros([niterations], np.float64) # energy differences, in kT
+    for iteration in range(niterations):
+        integrator.step(nsteps_per_iteration)
+        state = context.getState(getEnergy=True, getPositions=True)
+        x_n[iteration,:,:] = state.getPositions(asNumpy=True) / units.nanometers
+        u_n[iteration] = beta * state.getPotentialEnergy()
 
-        final_time = time.time()
-        elapsed_time = final_time - initial_time
+    if np.any(np.isnan(u_n)):
+        raise Exception("Encountered NaN for molecule %s | %s" % (cid, iupac_name))
 
-        # Clean up.
-        del context, integrator
+    final_time = time.time()
+    elapsed_time = final_time - initial_time
 
-        # Discard initial transient to equilibration.
-        [t0, g, Neff_max] = timeseries.detectEquilibration(u_n)
-        x_n = x_n[t0:,:,:]
-        u_n = u_n[t0:]
+    # Clean up.
+    del context, integrator
 
-        # Subsample to remove correlation.
-        indices = timeseries.subsampleCorrelatedData(u_n, g=g)
-        x_n = x_n[indices,:,:]
-        u_n = u_n[indices]
+    # Discard initial transient to equilibration.
+    [t0, g, Neff_max] = timeseries.detectEquilibration(u_n)
+    x_n = x_n[t0:,:,:]
+    u_n = u_n[t0:]
 
-        # Store data.
-        entry['x_n'] = x_n
-        entry['u_n'] = u_n
+    # Subsample to remove correlation.
+    indices = timeseries.subsampleCorrelatedData(u_n, g=g)
+    x_n = x_n[indices,:,:]
+    u_n = u_n[indices]
 
-        print "%48s | %64s | simulation %12.3f s | %5d samples discarded | %5d independent samples remain" % (cid, iupac_name, elapsed_time, t0, len(indices))
+    # Store data.
+    entry['x_n'] = x_n
+    entry['u_n'] = u_n
 
-    return
+    print "%48s | %64s | simulation %12.3f s | %5d samples discarded | %5d independent samples remain" % (cid, iupac_name, elapsed_time, t0, len(indices))
+
+    return [cid, entry]
+
 
 
 #=============================================================================================
@@ -209,11 +193,23 @@ def prepare_database(database, atomtypes_filename,parameters,  mol2_directory, v
     Wrapper function to prepare the database for sampling
 
     """
-
+    #TODO: fix this. Right now it inserts the path for the parent directory to access atomtyping.py
+    cwd = os.getcwd()
+    sys.path.insert(0,os.path.dirname(cwd))
+    from atomtyping import type_atoms
     database_prepped = load_database(database, mol2_directory, verbose=verbose)
     database_with_systems = create_openmm_systems(database_prepped, verbose=verbose)
     database_atomtyped = type_atoms(database_with_systems, atomtypes_filename, verbose=verbose)
-    database_simulated = generate_simulation_data(database_atomtyped, parameters)
+
+    gen_simulation_data_parallel = partial(generate_simulation_data, database_atomtyped, parameters)
+    pool = Pool(32)
+    sim_results = pool.map(gen_simulation_data_parallel, database_atomtyped.keys())
+    database_simulated = {}
+
+    #create a new database with the results of the simulation
+    for result in sim_results:
+        database_simulated[result[0]] = result[1]
+
     return database_simulated
 
 def load_database(database, mol2_directory, verbose=False):
@@ -303,7 +299,7 @@ def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
 
         prmtop_filename = os.path.join(path_to_prmtops, "%s.prmtop" % cid)
         inpcrd_filename = os.path.join(path_to_prmtops, "%s.inpcrd" % cid)
-        
+
         # Create OpenMM System object for molecule in vacuum.
         prmtop = app.AmberPrmtopFile(prmtop_filename)
         inpcrd = app.AmberInpcrdFile(inpcrd_filename)
@@ -316,3 +312,44 @@ def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
 
     return database
 
+if __name__=="__main__":
+    import os
+    import pickle
+    import sys
+    from optparse import OptionParser
+    from functools import partial
+    from multiprocessing import Pool
+    usage = """\
+    usage: %prog --types typefile --parameters parameterfile --output outputpickle
+    """
+    version_string = "%prog 1.0"
+    parser = OptionParser(usage=usage, version=version_string)
+    parser.add_option("-t", "--types", metavar='TYPES',
+                      action="store", type="string", dest='atomtypes_filename', default='',
+                      help="Filename defining atomtypes as SMARTS atom matches.")
+    parser.add_option("-p", "--parameters", metavar='PARAMETERS',
+                      action="store", type="string", dest='parameters_filename', default='',
+                      help="File containing initial parameter set.")
+    parser.add_option("-o", "--dbout", metavar='DBOUT',
+                      action="store", type="string", dest='dbout', default='database.prepared.pickle',
+                      help="Output name of the prepared database pickle")
+    (options,args) = parser.parse_args()
+    if options.atomtypes_filename=='' or options.parameters_filename=='':
+        parser.print_help()
+        parser.error("All input files must be specified.")
+
+
+    database_filepath = os.path.join(os.environ['FREESOLV_PATH'], 'database.pickle')
+    database_file = open(database_filepath,'r')
+    database_raw = pickle.load(database_file)
+    database_file.close()
+
+    mol2_directory = os.path.join(os.environ['FREESOLV_PATH'], 'tripos_mol2')
+    parameters = read_gbsa_parameters(options.parameters_filename)
+
+
+
+    database_prepared = prepare_database(database_raw, options.atomtypes_filename, parameters, mol2_directory, verbose=True)
+    outfile = open(options.dbout,'w')
+    pickle.dump(database_prepared, outfile)
+    outfile.close()
