@@ -268,7 +268,7 @@ def compute_hydration_energy_allmodel(entry, parameters, platform_name="CPU"):
     #print "%48s | %48s | DeltaG = %.3f +- %.3f kT " % (cid, iupac_name, energy, dDeltaG_in_kT)
 
 
-    return DeltaG_in_kT
+    return DeltaG_in_kT.in_units_of(units.kilocalories_per_mole)
 
 
 
