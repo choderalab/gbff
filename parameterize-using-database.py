@@ -98,19 +98,19 @@ if __name__=="__main__":
 
     # Read GBSA parameters.
     parameters = utils.read_gbsa_parameters(options.parameters_filename)
-    print parameters
+    print(parameters)
 
     mcmcIterations = options.iterations
     mcmcDbName     = os.path.abspath(options.mcmcout)
 
     # Open database.
     import pickle
-    database = pickle.load(open(options.database_filename, 'r'))
+    database = pickle.load(open(options.database_filename, 'rb'), encoding='latin1')
 
     # DEBUG: Create a small subset. Do this randomly
     if options.subset_size:
         subset_size = options.subset_size
-        cid_list = database.keys()
+        cid_list = list(database.keys())
         max_num = len(cid_list)
         mol_indices = np.random.choice(max_num, subset_size)
         mols_to_use = [cid_list[k] for k in mol_indices]

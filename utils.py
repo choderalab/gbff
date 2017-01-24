@@ -195,7 +195,7 @@ def generate_simulation_data(database, parameters):
         entry['x_n'] = x_n
         entry['u_n'] = u_n
 
-        print "%48s | %64s | simulation %12.3f s | %5d samples discarded | %5d independent samples remain" % (cid, iupac_name, elapsed_time, t0, len(indices))
+        print("%48s | %64s | simulation %12.3f s | %5d samples discarded | %5d independent samples remain" % (cid, iupac_name, elapsed_time, t0, len(indices)))
 
     return
 
@@ -269,10 +269,10 @@ def load_database(database, mol2_directory, verbose=False):
         entry['molecule'] = oechem.OEMol(molecule)
 
         if verbose:
-            print "%d molecules read" % len(database.keys())
+            print("%d molecules read" % len(database.keys()))
             end_time = time.time()
             elapsed_time = end_time - start_time
-            print "%.3f s elapsed" % elapsed_time
+            print("%.3f s elapsed" % elapsed_time)
     return database
 
 def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
@@ -303,7 +303,7 @@ def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
 
         prmtop_filename = os.path.join(path_to_prmtops, "%s.prmtop" % cid)
         inpcrd_filename = os.path.join(path_to_prmtops, "%s.inpcrd" % cid)
-        
+
         # Create OpenMM System object for molecule in vacuum.
         prmtop = app.AmberPrmtopFile(prmtop_filename)
         inpcrd = app.AmberInpcrdFile(inpcrd_filename)
@@ -315,4 +315,3 @@ def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
         entry['positions'] = positions
 
     return database
-

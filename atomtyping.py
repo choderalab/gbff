@@ -48,7 +48,7 @@ class AtomTyper(object):
 
     def dump(self):
         for pat,type,smarts in self.smartsList:
-            print pat,type,smarts
+            print(pat,type,smarts)
 
     def assignTypes(self,mol):
         # Assign null types.
@@ -69,7 +69,7 @@ class AtomTyper(object):
 
     def debugTypes(self,mol):
         for atom in mol.GetAtoms():
-            print "%6d %8s %8s" % (atom.GetIdx(),oechem.OEGetAtomicSymbol(atom.GetAtomicNum()),atom.GetStringData(self.pattyTag))
+            print("%6d %8s %8s" % (atom.GetIdx(),oechem.OEGetAtomicSymbol(atom.GetAtomicNum()),atom.GetStringData(self.pattyTag)))
 
     def getTypeList(self,mol):
         typeList = []
@@ -119,8 +119,8 @@ def type_atoms(database, atomtypes_filename, verbose=False):
             typed_molecules.append(oechem.OEGraphMol(molecule))
         except AtomTyper.TypingException as exception:
             name = molecule.GetTitle()
-            print name
-            print exception
+            print(name)
+            print(exception)
             untyped_molecules.append(oechem.OEGraphMol(molecule))
             if len(untyped_molecules) > 10:
                 sys.exit(-1)

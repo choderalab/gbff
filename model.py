@@ -267,7 +267,7 @@ class GBFFAllModels(GBFFModel):
         """
         params_to_group = []
         atomtypes = set()
-        for key in initial_parameters.iterkeys():
+        for key in initial_parameters.keys():
             (atomtype, parameter_name) = key.split('_')
             atomtypes.add(atomtype)
         for atomtype in atomtypes:
@@ -302,7 +302,7 @@ class GBFFAllModels(GBFFModel):
             parameters['gbmodel'] = pymc.Categorical('gbmodel', p=parameters['gbmodel_prior'])
         uninformative_tau = 0.0001
         joint_proposal_sets = {}
-        for (key, value) in initial_parameters.iteritems():
+        for (key, value) in initial_parameters.items():
             (atomtype, parameter_name) = key.split('_')
             if parameter_name == 'scalingFactor':
                 stochastic = pymc.Uniform(key, value=value, lower=-0.8, upper=+1.5)
