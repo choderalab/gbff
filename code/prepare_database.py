@@ -178,7 +178,7 @@ def generate_simulation_data(database, parameters, cid):
     entry['x_n'] = x_n
     entry['u_n'] = u_n
 
-    print "%48s | %64s | simulation %12.3f s | %5d samples discarded | %5d independent samples remain" % (cid, iupac_name, elapsed_time, t0, len(indices))
+    print("%48s | %64s | simulation %12.3f s | %5d samples discarded | %5d independent samples remain" % (cid, iupac_name, elapsed_time, t0, len(indices)))
 
     return [cid, entry]
 
@@ -265,10 +265,10 @@ def load_database(database, mol2_directory, verbose=False):
         entry['molecule'] = oechem.OEMol(molecule)
 
         if verbose:
-            print "%d molecules read" % len(database.keys())
+            print("%d molecules read" % len(database.keys()))
             end_time = time.time()
             elapsed_time = end_time - start_time
-            print "%.3f s elapsed" % elapsed_time
+            print("%.3f s elapsed" % elapsed_time)
     return database
 
 def create_openmm_systems(database, verbose=False, path_to_prmtops=None):
@@ -340,8 +340,8 @@ if __name__=="__main__":
 
 
     database_filepath = os.path.join(os.environ['FREESOLV_PATH'], 'database.pickle')
-    database_file = open(database_filepath,'r')
-    database_raw = pickle.load(database_file)
+    database_file = open(database_filepath,'rb')
+    database_raw = pickle.load(database_file, encoding='latin1')
     database_file.close()
 
     mol2_directory = os.path.join(os.environ['FREESOLV_PATH'], 'tripos_mol2')
