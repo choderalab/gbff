@@ -23,6 +23,14 @@ app = Celery('hydration_energies',
              broker=config['broker'],
              backend=config['backend'],
              include=['hydration_energies.energytasks'])
+
+app.conf.update(
+    result_expires = 3600,
+    task_serializer = 'pickle',
+    result_serializer = 'pickle',
+    accept_content = {'pickle'}
+    )
+
 @app.task
 def compute_hydration_energy(entry, parameters, platform_name="CPU"):
     """
